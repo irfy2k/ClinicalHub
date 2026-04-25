@@ -21,6 +21,15 @@ export const prescriptionService = {
   },
 
   async logMedication(log: Omit<MedicationLog, 'id'>): Promise<MedicationLog> {
+    const existingIndex = mockMedicationLogs.findIndex(
+      l => l.prescription_id === log.prescription_id && l.logged_at === log.logged_at
+    );
+
+    if (existingIndex !== -1) {
+      mockMedicationLogs[existingIndex].status = log.status;
+      return mockMedicationLogs[existingIndex];
+    }
+
     const newLog: MedicationLog = {
       ...log,
       id: `log-${Date.now()}`

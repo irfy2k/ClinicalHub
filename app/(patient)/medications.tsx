@@ -45,7 +45,7 @@ export default function MedicationsScreen() {
         const existingLog = allLogs.find(l =>
           l.prescription_id === p.id &&
           l.logged_at.startsWith(today) &&
-          l.logged_at.includes(time.replace(':', ''))
+          l.logged_at.includes(time)
         );
 
         todayEntries.push({
@@ -96,14 +96,9 @@ export default function MedicationsScreen() {
     loadData();
   };
 
-  // Calculate adherence from logs
-  const totalLoggedToday = timeline.filter(t => t.status !== 'pending').length;
-  const totalTaken = timeline.filter(t => t.status === 'taken').length;
-  const adherenceScore = totalLoggedToday > 0
-    ? Math.round((totalTaken / timeline.length) * 100)
-    : (logs.length > 0
-        ? Math.round((logs.filter(l => l.status === 'taken').length / logs.length) * 100)
-        : 100);
+  // Calculate adherence based accurately on all historical logs vs total tracked
+  const takenCount = logs.filter(l => l.status === 'taken').length;
+  const adherenceScore = logs.length > 0 ? Math.round((takenCount / logs.length) * 100) : 100;
 
   const activePrescriptions = prescriptions.filter(p => p.is_active);
 

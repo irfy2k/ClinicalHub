@@ -32,7 +32,7 @@ export default function QueueScreen() {
     loadAppointments();
   };
 
-  const todayAppts = appointments.filter(a => new Date(a.scheduled_at).toDateString() === new Date(Date.now() + 86400000).toDateString() || true); // Mock fallback to all
+  const todayAppts = appointments.filter(a => new Date(a.scheduled_at).toDateString() === new Date().toDateString());
 
   return (
     <View className="flex-1 bg-background">
@@ -54,7 +54,7 @@ export default function QueueScreen() {
           </Card>
           <Card className="flex-1 bg-surface py-4 px-4 items-center">
             <Text className="text-textMuted text-xs font-bold uppercase tracking-wider mb-2">Waiting</Text>
-            <Text className="text-primary font-bold text-3xl">{todayAppts.filter(a => a.status === 'pending').length}</Text>
+            <Text className="text-primary font-bold text-3xl">{todayAppts.filter(a => a.status === 'pending' || a.status === 'confirmed').length}</Text>
           </Card>
         </View>
 
@@ -69,7 +69,7 @@ export default function QueueScreen() {
                 <View className="w-12 h-12 bg-surfaceLight rounded-full items-center justify-center border border-borderDark mr-4">
                   <Text className="text-textLight font-bold">PT</Text>
                 </View>
-                <View>
+                <View className="flex-1 pr-4">
                   <Text className="text-textLight font-bold text-lg">Patient #{appt.patient_id.split('-')[1]}</Text>
                   <Text className="text-textMuted text-sm" numberOfLines={1}>
                     {new Date(appt.scheduled_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • {appt.notes?.split('|')[0] || 'Follow-up'}
@@ -152,17 +152,30 @@ export default function QueueScreen() {
               </View>
             )}
 
-            <Button 
-              label="Message Patient" 
-              variant="secondary"
-              className="w-full mb-4" 
-              onPress={() => {
-                if (!selectedAppt) return;
-                const apptId = selectedAppt.id;
-                setSelectedAppt(null);
-                router.push(`/chat/${apptId}` as any);
-              }} 
-            />
+            <View className="flex-row mb-4">
+              <Button 
+                label="Message Patient" 
+                variant="secondary"
+                className="flex-1 mr-2 px-1" 
+                onPress={() => {
+                  if (!selectedAppt) return;
+                  const apptId = selectedAppt.id;
+                  setSelectedAppt(null);
+                  router.push(`/chat/${apptId}` as any);
+                }} 
+              />
+              <Button 
+                label="Prescribe Medicine" 
+                variant="secondary"
+                className="flex-1 ml-2 px-1 text-center" 
+                onPress={() => {
+                  if (!selectedAppt) return;
+                  const patientId = selectedAppt.patient_id;
+                  setSelectedAppt(null);
+                  router.push({ pathname: '/(doctor)/prescriptions', params: { patientId } } as any);
+                }} 
+              />
+            </View>
 
             <Text className="text-textMuted text-xs font-bold uppercase tracking-wider mb-3">Update Status</Text>
             

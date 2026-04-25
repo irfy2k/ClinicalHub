@@ -46,8 +46,8 @@ export let mockAppointments: Appointment[] = [
     id: 'appt-1',
     patient_id: 'patient-1',
     doctor_id: 'doctor-1',
-    status: 'confirmed',
-    scheduled_at: new Date(Date.now() + 86400000).toISOString(),
+    status: 'pending',
+    scheduled_at: new Date(Date.now() + 3600000).toISOString(),
     notes: 'Regular checkup',
     created_at: new Date().toISOString()
   },

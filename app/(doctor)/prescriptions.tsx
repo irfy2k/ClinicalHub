@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import clsx from 'clsx';
 import { View, Text, ScrollView, TouchableOpacity, Modal, Alert } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
@@ -8,7 +9,7 @@ import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { mockUsers } from '../../services/mock/mockData';
-import clsx from 'clsx';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 
 const TIME_SLOTS = [
   '06:00', '07:00', '08:00', '09:00', '10:00', '11:00', '12:00',
@@ -17,6 +18,7 @@ const TIME_SLOTS = [
 
 export default function DoctorPrescriptions() {
   const { user } = useAuth();
+  const params = useLocalSearchParams();
   const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
   const [filter, setFilter] = useState<'Active' | 'All'>('Active');
   const [isCreating, setIsCreating] = useState(false);
@@ -33,6 +35,13 @@ export default function DoctorPrescriptions() {
   useEffect(() => {
     loadPrescriptions();
   }, [user]);
+
+  useEffect(() => {
+    if (params?.patientId && typeof params.patientId === 'string') {
+      setIsCreating(true);
+      setSelectedPatientId(params.patientId);
+    }
+  }, [params?.patientId]);
 
   const loadPrescriptions = async () => {
     if (!user) return;
