@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, KeyboardAvoidingView, Platform, ScrollView, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useAuth } from '../../context/AuthContext';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -25,6 +26,7 @@ const CONDITIONS = [
 
 export default function OnboardingScreen() {
   const router = useRouter();
+  const { updateUser } = useAuth();
   const [selectedConditions, setSelectedConditions] = useState<string[]>([]);
   
   const { control, handleSubmit, formState: { errors } } = useForm<FormData>({
@@ -41,8 +43,15 @@ export default function OnboardingScreen() {
   };
 
   const onSubmit = (data: FormData) => {
-    console.log('Final medical data:', { ...data, conditions: selectedConditions });
-    // Here we would save to user's medical_history
+    updateUser({
+      medical_history: {
+        height: data.height,
+        weight: data.weight,
+        blood_type: data.bloodType,
+        allergies: data.allergies ? data.allergies.split(',').map(a => a.trim()) : [],
+        conditions: selectedConditions,
+      }
+    });
     router.replace('/(patient)/dashboard');
   };
 

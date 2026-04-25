@@ -6,8 +6,8 @@ import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 
 export default function LoginScreen() {
-  const [email, setEmail] = useState('dr.smith@clinic.com');
-  const [password, setPassword] = useState('password123');
+  const [email, setEmail] = useState('john@example.com');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const { login } = useAuth();
   const router = useRouter();
