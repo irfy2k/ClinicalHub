@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, Image, TouchableOpacity, Alert, KeyboardAvoidingView, Platform, ActionSheetIOS } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Alert, KeyboardAvoidingView, Platform } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
+import { DefaultAvatar } from '../../components/ui/DefaultAvatar';
 import { useAuth } from '../../context/AuthContext';
 
 export default function DoctorProfileScreen() {
@@ -22,7 +23,7 @@ export default function DoctorProfileScreen() {
   ];
 
   const handleUpdate = () => {
-    updateUser({ name, phone_number: phone, avatar_url: avatar, available_times: availableTimes });
+    updateUser({ name, phone_number: phone, avatar_url: avatar || undefined, available_times: availableTimes });
     Alert.alert('Success', 'Profile and schedule updated successfully.');
   };
 
@@ -91,10 +92,7 @@ export default function DoctorProfileScreen() {
       <ScrollView contentContainerStyle={{ padding: 24 }}>
         <View className="flex-row items-center bg-surfaceLight border border-borderDark rounded-xl p-4 mb-8">
            <TouchableOpacity onPress={handlePickAvatar} className="relative mr-4">
-             <Image 
-               source={{ uri: avatar || user?.avatar_url || 'https://i.pravatar.cc/150?u=doctor' }}
-               className="w-16 h-16 rounded-full border border-borderDark"
-             />
+             <DefaultAvatar uri={avatar || user?.avatar_url} size={64} />
              <View className="absolute bottom-0 right-0 bg-primary w-6 h-6 rounded-full items-center justify-center shadow-lg border-2 border-background">
                 <FontAwesome name="camera" size={10} color="#121417" />
              </View>
@@ -118,13 +116,7 @@ export default function DoctorProfileScreen() {
            value={phone}
            onChangeText={setPhone}
            keyboardType="phone-pad"
-        />
-
-        <Input 
-           label="Profile Picture URL"
-           value={avatar}
-           onChangeText={setAvatar}
-           placeholder="e.g. https://i.pravatar.cc/150"
+           placeholder="+92 3XX-XXXXXXX"
         />
 
         <Text className="text-textLight font-bold mb-2 uppercase text-xs tracking-wider mt-4">Working Hours (30min Blocks)</Text>

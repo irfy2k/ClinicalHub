@@ -5,7 +5,7 @@ import {
   onAuthStateChanged,
   User as FirebaseUser,
 } from 'firebase/auth';
-import { ref, set, get } from 'firebase/database';
+import { ref, set, get, query, orderByChild, equalTo } from 'firebase/database';
 import { auth, database } from './firebaseConfig';
 import { User } from '../../types/database';
 
@@ -89,6 +89,29 @@ export const firebaseAuthService = {
     } catch (error) {
       console.error('[Firebase Auth] getUser error:', error);
       return null;
+    }
+  },
+
+  /**
+   * Get all users with a specific role (e.g., 'patient' or 'doctor').
+   * Used to populate doctor lists for booking and patient lists for prescriptions.
+   */
+  async getUsersByRole(role: 'patient' | 'doctor'): Promise<User[]> {
+    try {
+      const usersRef = ref(database, 'users');
+      const q = query(usersRef, orderByChild('role'), equalTo(role));
+      const snapshot = await get(q);
+
+      if (!snapshot.exists()) return [];
+
+      const results: User[] = [];
+      snapshot.forEach((child) => {
+        results.push({ id: child.key!, ...child.val() });
+      });
+      return results;
+    } catch (error) {
+      console.error('[Firebase Auth] getUsersByRole error:', error);
+      return [];
     }
   },
 

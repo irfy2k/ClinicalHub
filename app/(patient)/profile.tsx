@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, Image, TouchableOpacity, Alert, KeyboardAvoidingView, Platform, ActionSheetIOS } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Alert, KeyboardAvoidingView, Platform } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
+import { DefaultAvatar } from '../../components/ui/DefaultAvatar';
 import { useAuth } from '../../context/AuthContext';
 import { useRouter } from 'expo-router';
 
@@ -16,7 +17,7 @@ export default function PatientProfileScreen() {
   const [avatar, setAvatar] = useState(user?.avatar_url || '');
 
   const handleUpdate = () => {
-    updateUser({ name, phone_number: phone, avatar_url: avatar });
+    updateUser({ name, phone_number: phone, avatar_url: avatar || undefined });
     Alert.alert('Success', 'Profile updated successfully.');
   };
 
@@ -77,17 +78,14 @@ export default function PatientProfileScreen() {
 
       <ScrollView contentContainerStyle={{ padding: 24 }}>
         <View className="items-center mb-8 pb-8 border-b border-borderDark/50 relative">
-          <TouchableOpacity onPress={handlePickAvatar} className="relative">
-            <Image 
-              source={{ uri: avatar || user?.avatar_url || 'https://i.pravatar.cc/150?u=patient' }}
-              className="w-24 h-24 rounded-full border-4 border-surfaceLight mb-4"
-            />
-            <View className="absolute bottom-4 right-0 bg-primary w-8 h-8 rounded-full items-center justify-center shadow-lg border-2 border-background">
+          <TouchableOpacity onPress={handlePickAvatar} className="relative mb-4">
+            <DefaultAvatar uri={avatar || user?.avatar_url} size={96} />
+            <View className="absolute bottom-0 right-0 bg-primary w-8 h-8 rounded-full items-center justify-center shadow-lg border-2 border-background">
                <FontAwesome name="camera" size={12} color="#121417" />
             </View>
           </TouchableOpacity>
           <Text className="text-xl font-bold text-textLight">{user?.name}</Text>
-          <Text className="text-textMuted text-sm">Patient ID: {user?.id.split('-')[1] || 'N/A'}</Text>
+          <Text className="text-textMuted text-sm">Patient ID: {user?.id.substring(0, 8) || 'N/A'}</Text>
         </View>
 
         <Text className="text-textLight font-bold mb-4 uppercase text-xs tracking-wider">Account Details</Text>
@@ -109,13 +107,7 @@ export default function PatientProfileScreen() {
            value={phone}
            onChangeText={setPhone}
            keyboardType="phone-pad"
-        />
-
-        <Input 
-           label="Profile Picture URL"
-           value={avatar}
-           onChangeText={setAvatar}
-           placeholder="e.g. https://i.pravatar.cc/150"
+           placeholder="+92 3XX-XXXXXXX"
         />
 
         <Button label="Save Changes" onPress={handleUpdate} className="mt-4" />

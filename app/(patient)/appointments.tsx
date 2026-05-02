@@ -3,12 +3,13 @@ import { View, Text, ScrollView, TouchableOpacity, Modal } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { Services } from '../../services';
-import { Appointment } from '../../types/database';
+import { Appointment, User } from '../../types/database';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Card } from '../../components/ui/Card';
 import { IntakeWizard } from '../../components/symptoms/IntakeWizard';
 import { notificationService } from '../../services/notificationService';
+import { firebaseAuthService } from '../../services/firebase/firebaseAuthService';
 import clsx from 'clsx';
 import { useRouter } from 'expo-router';
 
@@ -19,10 +20,13 @@ export default function PatientAppointments() {
   const [isBooking, setIsBooking] = useState(false);
   const [wizardTargetDoctor, setWizardTargetDoctor] = useState<string | null>(null);
   const [wizardTargetTime, setWizardTargetTime] = useState<string | null>(null);
+  const [wizardDoctorName, setWizardDoctorName] = useState<string>('');
+  const [doctors, setDoctors] = useState<User[]>([]);
   const router = useRouter();
 
   useEffect(() => {
     loadAppointments();
+    loadDoctors();
   }, [user]);
 
   const loadAppointments = async () => {
@@ -31,23 +35,37 @@ export default function PatientAppointments() {
     setAppointments(data);
   };
 
-  const handleBook = (doctorId: string, timeSlot: string) => {
+  const loadDoctors = async () => {
+    const docs = await firebaseAuthService.getUsersByRole('doctor');
+    setDoctors(docs);
+  };
+
+  const handleBook = (doctorId: string, doctorName: string, timeSlot: string) => {
     setWizardTargetDoctor(doctorId);
+    setWizardDoctorName(doctorName);
     setWizardTargetTime(timeSlot);
   };
 
   const handleIntakeComplete = async (intakeData: any) => {
     if (!user || !wizardTargetDoctor) return;
     
-    // Parse time to actual mock target
+    // Schedule for today at the selected time slot
     const today = new Date();
-    // Defaulting to "tomorrow" if needed, or today based on original code mockup
-    
-    const scheduledAt = new Date(Date.now() + 86400000).toISOString(); // Mock tomorrow
+    if (wizardTargetTime) {
+      const [hours, minutes] = wizardTargetTime.split(':').map(Number);
+      today.setHours(hours, minutes, 0, 0);
+    }
+    // If the slot is already passed today, schedule for tomorrow
+    if (today.getTime() < Date.now()) {
+      today.setDate(today.getDate() + 1);
+    }
+    const scheduledAt = today.toISOString();
     
     await Services.appointment.create({
       patient_id: user.id,
       doctor_id: wizardTargetDoctor,
+      patient_name: user.name,
+      doctor_name: wizardDoctorName,
       status: 'pending',
       scheduled_at: scheduledAt,
       notes: `Symptoms: ${intakeData.symptoms} | Pain: ${intakeData.painLevel}/10 | Duration: ${intakeData.duration} | Slot: ${wizardTargetTime}`
@@ -56,18 +74,19 @@ export default function PatientAppointments() {
     // Schedule a push notification reminder 30 minutes before the appointment
     await notificationService.scheduleAppointmentReminder(
       `appt-${Date.now()}`,
-      'Dr. Sarah Jenkins',
+      wizardDoctorName,
       scheduledAt
     );
 
     // Confirm booking with an instant notification
     await notificationService.sendInstantNotification(
       '📅 Appointment Booked',
-      `Your appointment for ${wizardTargetTime} has been confirmed. You\'ll be reminded 30 minutes before.`
+      `Your appointment with ${wizardDoctorName} for ${wizardTargetTime} has been confirmed. You'll be reminded 30 minutes before.`
     );
 
     setWizardTargetDoctor(null);
     setWizardTargetTime(null);
+    setWizardDoctorName('');
     setIsBooking(false);
     loadAppointments();
   };
@@ -111,7 +130,7 @@ export default function PatientAppointments() {
               <View className="flex-row justify-between items-start mb-3">
                 <View>
                   <Text className="text-primary text-xs font-bold uppercase tracking-wider mb-1">{appt.status}</Text>
-                  <Text className="text-textLight font-bold text-lg">Dr. Smith</Text>
+                  <Text className="text-textLight font-bold text-lg">{appt.doctor_name || 'Doctor'}</Text>
                   <Text className="text-textMuted text-sm">General Practice</Text>
                 </View>
                 <View className="bg-surfaceLight px-3 py-1.5 rounded-lg border border-borderDark items-center">
@@ -194,35 +213,45 @@ export default function PatientAppointments() {
 
           <Text className="text-textLight font-bold mt-4 mb-4">Available Doctors & Times</Text>
 
-          {/* Ideally fetching from mockUsers matching doctor role */}
-          <Card className="mb-4 bg-surfaceLight border-borderDark flex-col">
-            <View className="flex-row items-center justify-between mb-4">
-              <View className="flex-row items-center">
-                <View className="w-12 h-12 bg-surface rounded-full items-center justify-center border border-borderDark mr-4">
-                   <FontAwesome name="user-md" size={20} color="#94A3B8" />
-                </View>
-                <View>
-                  <Text className="text-textLight font-bold text-lg">Dr. Sarah Jenkins</Text>
-                  <Text className="text-textMuted text-sm">Cardiology • 4.9 ★</Text>
-                </View>
+          <ScrollView>
+            {doctors.length === 0 ? (
+              <View className="items-center py-10">
+                <FontAwesome name="user-md" size={48} color="#2F333A" />
+                <Text className="text-textMuted mt-4">No doctors registered yet</Text>
               </View>
-            </View>
-            <View className="border-t border-borderDark pt-4">
-              <Text className="text-textMuted text-xs font-bold uppercase tracking-wider mb-3">Available Today (30m blocks)</Text>
-              <View className="flex-row flex-wrap gap-2">
-                 {['09:00', '10:30', '14:00', '15:30'].map(slot => (
-                    <TouchableOpacity 
-                      key={slot} 
-                      className="bg-primary/20 border border-primary rounded px-3 py-2"
-                      onPress={() => handleBook('doctor-1', slot)}
-                    >
-                       <Text className="text-primary font-bold">{slot}</Text>
-                    </TouchableOpacity>
-                 ))}
-                 <Text className="text-textMuted text-xs ml-2 self-center">Tap to Book</Text>
-              </View>
-            </View>
-          </Card>
+            ) : (
+              doctors.map(doc => (
+                <Card key={doc.id} className="mb-4 bg-surfaceLight border-borderDark flex-col">
+                  <View className="flex-row items-center justify-between mb-4">
+                    <View className="flex-row items-center">
+                      <View className="w-12 h-12 bg-surface rounded-full items-center justify-center border border-borderDark mr-4">
+                         <FontAwesome name="user-md" size={20} color="#94A3B8" />
+                      </View>
+                      <View>
+                        <Text className="text-textLight font-bold text-lg">{doc.name}</Text>
+                        <Text className="text-textMuted text-sm">General Practice</Text>
+                      </View>
+                    </View>
+                  </View>
+                  <View className="border-t border-borderDark pt-4">
+                    <Text className="text-textMuted text-xs font-bold uppercase tracking-wider mb-3">Available Slots (30m blocks)</Text>
+                    <View className="flex-row flex-wrap gap-2">
+                       {(doc.available_times || ['09:00', '10:00', '14:00', '15:00']).map(slot => (
+                          <TouchableOpacity 
+                            key={slot} 
+                            className="bg-primary/20 border border-primary rounded px-3 py-2"
+                            onPress={() => handleBook(doc.id, doc.name, slot)}
+                          >
+                             <Text className="text-primary font-bold">{slot}</Text>
+                          </TouchableOpacity>
+                       ))}
+                       <Text className="text-textMuted text-xs ml-2 self-center">Tap to Book</Text>
+                    </View>
+                  </View>
+                </Card>
+              ))
+            )}
+          </ScrollView>
         </View>
       </Modal>
 

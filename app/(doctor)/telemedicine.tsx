@@ -1,17 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, Image, Linking, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, Linking, Alert } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../context/AuthContext';
-import { mockUsers } from '../../services/mock/mockData';
 import { Services } from '../../services';
-import { Appointment } from '../../types/database';
+import { Appointment, User } from '../../types/database';
+import { DefaultAvatar } from '../../components/ui/DefaultAvatar';
 
 export default function TelemedicineScreen() {
   const router = useRouter();
   const { user } = useAuth();
   
   const [activeAppointment, setActiveAppointment] = useState<Appointment | null>(null);
+  const [activePatient, setActivePatient] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -27,15 +28,17 @@ export default function TelemedicineScreen() {
         return now >= (apptTime - 15 * 60000) && now <= (apptTime + 30 * 60000);
       });
       setActiveAppointment(current || null);
+
+      // Fetch patient profile from Firebase
+      if (current) {
+        const patient = await Services.auth.getUser(current.patient_id);
+        setActivePatient(patient);
+      }
+
       setLoading(false);
     };
     checkActiveSlot();
   }, [user]);
-
-  // Match the patient based on the active appointment
-  const activePatient = activeAppointment 
-     ? mockUsers.find(u => u.id === activeAppointment.patient_id) 
-     : null;
 
   const initiateNativeCall = () => {
     if (!activePatient?.phone_number) {
@@ -106,11 +109,7 @@ export default function TelemedicineScreen() {
 
        {/* Doctor PIP */}
        <View className="absolute right-6 bottom-32 w-24 h-32 bg-surface border-2 border-borderDark rounded-xl overflow-hidden items-center justify-center shadow-lg">
-          <Image 
-            source={{ uri: user?.avatar_url || 'https://i.pravatar.cc/150?u=doctor' }}
-            className="w-full h-full opacity-80"
-            resizeMode="cover"
-          />
+          <DefaultAvatar uri={user?.avatar_url} size={60} />
        </View>
 
        <View className="absolute bottom-10 left-0 right-0 flex-row justify-center items-center gap-x-6">

@@ -4,12 +4,12 @@ import { View, Text, ScrollView, TouchableOpacity, Modal, Alert } from 'react-na
 import { FontAwesome } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { Services } from '../../services';
-import { Prescription } from '../../types/database';
+import { Prescription, User } from '../../types/database';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { notificationService } from '../../services/notificationService';
-import { mockUsers } from '../../services/mock/mockData';
+import { firebaseAuthService } from '../../services/firebase/firebaseAuthService';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 
 const TIME_SLOTS = [
@@ -23,6 +23,7 @@ export default function DoctorPrescriptions() {
   const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
   const [filter, setFilter] = useState<'Active' | 'All'>('Active');
   const [isCreating, setIsCreating] = useState(false);
+  const [patientUsers, setPatientUsers] = useState<User[]>([]);
 
   // New prescription form state
   const [medName, setMedName] = useState('');
@@ -35,6 +36,7 @@ export default function DoctorPrescriptions() {
 
   useEffect(() => {
     loadPrescriptions();
+    loadPatients();
   }, [user]);
 
   useEffect(() => {
@@ -48,6 +50,11 @@ export default function DoctorPrescriptions() {
     if (!user) return;
     const data = await Services.prescription.getByDoctor(user.id);
     setPrescriptions(data);
+  };
+
+  const loadPatients = async () => {
+    const patients = await firebaseAuthService.getUsersByRole('patient');
+    setPatientUsers(patients);
   };
 
   const toggleTime = (time: string) => {
@@ -74,9 +81,13 @@ export default function DoctorPrescriptions() {
       return;
     }
 
+    const patientName = patientUsers.find(u => u.id === selectedPatientId)?.name || 'Patient';
+
     const newPrescription = await Services.prescription.create({
       patient_id: selectedPatientId,
       doctor_id: user.id,
+      patient_name: patientName,
+      doctor_name: user.name,
       medication_name: medName,
       dosage,
       schedule_times: selectedTimes,
@@ -90,7 +101,6 @@ export default function DoctorPrescriptions() {
     await notificationService.scheduleMedicationReminders(newPrescription);
 
     // Send confirmation notification
-    const patientName = mockUsers.find(u => u.id === selectedPatientId)?.name || 'Patient';
     await notificationService.sendInstantNotification(
       '💊 New Prescription Issued',
       `${medName} (${dosage}) has been prescribed to ${patientName}. Reminders have been scheduled.`
@@ -101,8 +111,6 @@ export default function DoctorPrescriptions() {
     loadPrescriptions();
     Alert.alert('Success', 'Prescription created and reminders scheduled.');
   };
-
-  const patientUsers = mockUsers.filter(u => u.role === 'patient');
 
   const filtered = filter === 'Active'
     ? prescriptions.filter(p => p.is_active)
@@ -169,7 +177,7 @@ export default function DoctorPrescriptions() {
               <View className="flex-row items-center mb-2">
                 <FontAwesome name="user" size={12} color="#94A3B8" />
                 <Text className="text-textMuted text-sm ml-2">
-                  Patient: {mockUsers.find(u => u.id === presc.patient_id)?.name || presc.patient_id}
+                  Patient: {presc.patient_name || presc.patient_id}
                 </Text>
               </View>
 
@@ -213,32 +221,36 @@ export default function DoctorPrescriptions() {
 
           {/* Patient Selection */}
           <Text className="text-textMuted text-xs uppercase tracking-wider font-bold mb-3">Select Patient</Text>
-          <View className="flex-row flex-wrap gap-2 mb-6">
-            {patientUsers.map(patient => (
-              <TouchableOpacity
-                key={patient.id}
-                className={clsx(
-                  "px-4 py-3 rounded-xl border flex-row items-center",
-                  selectedPatientId === patient.id
-                    ? "bg-primary/20 border-primary"
-                    : "bg-surfaceLight border-borderDark"
-                )}
-                onPress={() => setSelectedPatientId(patient.id)}
-              >
-                <View className={clsx(
-                  "w-8 h-8 rounded-full items-center justify-center mr-3 border",
-                  selectedPatientId === patient.id ? "border-primary bg-primary/30" : "border-borderDark bg-surface"
-                )}>
-                  <Text className={clsx("font-bold text-sm", selectedPatientId === patient.id ? "text-primary" : "text-textMuted")}>
-                    {patient.name.split(' ').map(n => n[0]).join('')}
+          {patientUsers.length === 0 ? (
+            <Text className="text-textMuted text-sm mb-6">No patients registered yet.</Text>
+          ) : (
+            <View className="flex-row flex-wrap gap-2 mb-6">
+              {patientUsers.map(patient => (
+                <TouchableOpacity
+                  key={patient.id}
+                  className={clsx(
+                    "px-4 py-3 rounded-xl border flex-row items-center",
+                    selectedPatientId === patient.id
+                      ? "bg-primary/20 border-primary"
+                      : "bg-surfaceLight border-borderDark"
+                  )}
+                  onPress={() => setSelectedPatientId(patient.id)}
+                >
+                  <View className={clsx(
+                    "w-8 h-8 rounded-full items-center justify-center mr-3 border",
+                    selectedPatientId === patient.id ? "border-primary bg-primary/30" : "border-borderDark bg-surface"
+                  )}>
+                    <Text className={clsx("font-bold text-sm", selectedPatientId === patient.id ? "text-primary" : "text-textMuted")}>
+                      {patient.name.split(' ').map(n => n[0]).join('')}
+                    </Text>
+                  </View>
+                  <Text className={clsx("font-bold", selectedPatientId === patient.id ? "text-primary" : "text-textLight")}>
+                    {patient.name}
                   </Text>
-                </View>
-                <Text className={clsx("font-bold", selectedPatientId === patient.id ? "text-primary" : "text-textLight")}>
-                  {patient.name}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
 
           {/* Medication Details */}
           <Input

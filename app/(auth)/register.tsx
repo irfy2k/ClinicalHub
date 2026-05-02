@@ -9,6 +9,25 @@ import { UserRole } from '../../types/database';
 import clsx from 'clsx';
 import { FontAwesome } from '@expo/vector-icons';
 
+/**
+ * Formats a raw numeric input into Pakistani phone format: 03XX-XXXXXXX
+ * Strips non-digit characters, enforces max 11 digits, inserts dash after 4th digit.
+ */
+function formatPakistaniPhone(raw: string): string {
+  const digits = raw.replace(/\D/g, '').slice(0, 11);
+  if (digits.length <= 4) return digits;
+  return `${digits.slice(0, 4)}-${digits.slice(4)}`;
+}
+
+/**
+ * Validates a Pakistani phone number.
+ * Accepts: 03XX-XXXXXXX, 03XXXXXXXXX, +923XXXXXXXXX, 00923XXXXXXXXX
+ */
+function isValidPakistaniPhone(phone: string): boolean {
+  const cleaned = phone.replace(/[\s-]/g, '');
+  return /^((\+92|0092)3\d{9}|03\d{9})$/.test(cleaned);
+}
+
 export default function RegisterScreen() {
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
@@ -20,19 +39,32 @@ export default function RegisterScreen() {
   const { register } = useAuth();
   const router = useRouter();
 
+  const handlePhoneChange = (text: string) => {
+    setPhone(formatPakistaniPhone(text));
+  };
+
   const handleRegister = async () => {
     setError('');
     if (!email || !name || !role || !phone || !password) {
       setError('Please fill in all fields and select a role');
       return;
     }
+
+    // Validate Pakistani phone number
+    if (!isValidPakistaniPhone(phone)) {
+      setError('Please enter a valid Pakistani phone number (e.g. 03XX-XXXXXXX)');
+      return;
+    }
+
+    // Convert display format to international format for storage
+    const internationalPhone = '+92' + phone.replace(/[\s-]/g, '').replace(/^0/, '');
     
     try {
       await register({
         email,
         name,
         role,
-        phone_number: phone
+        phone_number: internationalPhone
       }, password);
       if (role === 'patient') {
         router.push('/(auth)/onboarding');
@@ -97,7 +129,7 @@ export default function RegisterScreen() {
         <View className="mb-6">
           <Input
             label="Full Name"
-            placeholder="John Doe"
+            placeholder="Ahmed Khan"
             value={name}
             onChangeText={setName}
             autoCapitalize="words"
@@ -112,13 +144,24 @@ export default function RegisterScreen() {
             autoCapitalize="none"
           />
 
-          <Input
-            label="Mobile Phone Number"
-            placeholder="+1 555-0100"
-            value={phone}
-            onChangeText={setPhone}
-            keyboardType="phone-pad"
-          />
+          <View>
+            <Text className="text-textMuted text-xs font-bold uppercase tracking-wider mb-1 ml-1">Mobile Phone Number</Text>
+            <View className="flex-row items-center bg-surface border border-borderDark rounded-xl mb-4">
+              <View className="px-3 py-3 border-r border-borderDark bg-surfaceLight rounded-l-xl">
+                <Text className="text-textLight font-bold">🇵🇰 +92</Text>
+              </View>
+              <View className="flex-1">
+                <Input
+                  placeholder="03XX-XXXXXXX"
+                  value={phone}
+                  onChangeText={handlePhoneChange}
+                  keyboardType="phone-pad"
+                  maxLength={12}
+                />
+              </View>
+            </View>
+          </View>
+
           <Input
             label="Password"
             placeholder="••••••••"

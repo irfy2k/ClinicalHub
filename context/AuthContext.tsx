@@ -2,12 +2,13 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useRouter, useSegments } from 'expo-router';
 import { User } from '../types/database';
 import { Services } from '../services';
+import { firebaseAuthService } from '../services/firebase/firebaseAuthService';
 
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
-  login: (email: string, password?: string) => Promise<void>;
-  register: (data: Omit<User, 'id' | 'created_at'>, password?: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<void>;
+  register: (data: Omit<User, 'id' | 'created_at'>, password: string) => Promise<void>;
   logout: () => Promise<void>;
   updateUser: (updates: Partial<User>) => void;
 }
@@ -61,18 +62,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // In a real app we would check secure storage for session here.
-  // When using Firebase backend, onAuthStateChanged handles session restoration.
+  // Restore session from Firebase Auth on app launch
   useEffect(() => {
-    setIsLoading(false);
+    const unsubscribe = firebaseAuthService.onAuthStateChanged(async (firebaseUser) => {
+      if (firebaseUser) {
+        // Fetch user profile from Realtime Database
+        const profile = await firebaseAuthService.getUser(firebaseUser.uid);
+        setUser(profile);
+      } else {
+        setUser(null);
+      }
+      setIsLoading(false);
+    });
+
+    return unsubscribe;
   }, []);
 
   useProtectedRoute(user, isLoading);
 
-  const login = async (email: string, password?: string) => {
+  const login = async (email: string, password: string) => {
     setIsLoading(true);
     try {
-      const u = await Services.auth.login(email);
+      const u = await Services.auth.login(email, password);
       if (u) setUser(u);
       else throw new Error("User not found");
     } finally {
@@ -80,10 +91,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const register = async (data: Omit<User, 'id' | 'created_at'>, password?: string) => {
+  const register = async (data: Omit<User, 'id' | 'created_at'>, password: string) => {
     setIsLoading(true);
     try {
-      const u = await Services.auth.register(data);
+      const u = await Services.auth.register(data, password);
       setUser(u);
     } finally {
       setIsLoading(false);
@@ -93,6 +104,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = async () => {
     setIsLoading(true);
     try {
+      await firebaseAuthService.logout();
       setUser(null);
     } finally {
       setIsLoading(false);
@@ -101,7 +113,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const updateUser = (updates: Partial<User>) => {
     if (user) {
-      setUser({ ...user, ...updates });
+      const updatedUser = { ...user, ...updates };
+      setUser(updatedUser);
+      // Persist to Firebase
+      firebaseAuthService.updateProfile(user.id, updates).catch(console.error);
     }
   };
 

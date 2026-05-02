@@ -102,11 +102,15 @@ This project is a deterministic healthcare application built for both **Patients
 
 ## 6. Current Status
 **Last Updated:** 2026-05-02
-**Active Phase:** Phase 3 Complete — App is now actively running on a live Firebase configuration. `BACKEND` is set to `'firebase'` in `services/index.ts`. 
+**Active Phase:** Phase 3 Complete — App is fully migrated to a live Firebase backend. All mock data has been removed.
 
-**Pending Refactoring Tasks:**
-- Complete removal of local mock data and `mockUsers` references.
-- Fix avatar placeholders to use default vectors instead of external `pravatar` URLs.
-- Add Pakistani phone number validation on the register screen.
-- Improve Firebase rules and UI state handling for doctor-patient interactions (chat, prescriptions).
-- Comprehensive end-to-end testing of the Firebase implementation.
+**Completed Refactoring Tasks:**
+- Removed local mock data and `mockUsers` references completely.
+- Replaced `pravatar.cc` URLs with `DefaultAvatar` component using FontAwesome.
+- Added Pakistani phone number validation on the register screen (`+92` format).
+- Denormalized patient and doctor names on prescriptions and appointments.
+- Upgraded the chat feature to use Firebase Realtime listeners instead of polling.
+
+**Next Steps:**
+- Follow the Testing Guide in `IMPLEMENTATION_PLAN.md` to verify end-to-end functionality across multiple devices.
+- Phase 4: Implement WebRTC for actual telemedicine video calling.

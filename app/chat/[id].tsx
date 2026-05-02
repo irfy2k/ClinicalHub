@@ -5,6 +5,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '../../context/AuthContext';
 import { Services } from '../../services';
 import { ChatMessage } from '../../types/database';
+import { firebaseChatService } from '../../services/firebase/firebaseChatService';
 
 export default function ChatScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -16,17 +17,16 @@ export default function ChatScreen() {
   const scrollViewRef = useRef<ScrollView>(null);
 
   useEffect(() => {
-    loadMessages();
-    // Simulate real-time mock
-    const interval = setInterval(loadMessages, 3000);
-    return () => clearInterval(interval);
-  }, [id]);
-
-  const loadMessages = async () => {
     if (!id) return;
-    const data = await Services.chat.getByAppointment(id);
-    setMessages(data);
-  };
+
+    // Subscribe to real-time message updates via Firebase listener
+    const unsubscribe = firebaseChatService.onMessagesChanged(id, (msgs) => {
+      setMessages(msgs);
+    });
+
+    // Cleanup listener on unmount
+    return () => unsubscribe();
+  }, [id]);
 
   const handleSend = async () => {
     if (!inputText.trim() || !user || !id) return;
@@ -38,7 +38,6 @@ export default function ChatScreen() {
     });
     
     setInputText('');
-    loadMessages();
     setTimeout(() => {
       scrollViewRef.current?.scrollToEnd({ animated: true });
     }, 100);

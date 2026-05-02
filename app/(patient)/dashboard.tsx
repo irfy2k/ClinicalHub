@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Image, Modal, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Modal, KeyboardAvoidingView, Platform } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { Card } from '../../components/ui/Card';
+import { DefaultAvatar } from '../../components/ui/DefaultAvatar';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { useRouter } from 'expo-router';
@@ -38,10 +39,7 @@ export default function DashboardScreen() {
            onPress={() => router.push('/(patient)/profile')}
            className="flex-row items-center"
         >
-          <Image 
-            source={{ uri: user?.avatar_url || 'https://i.pravatar.cc/150?u=patient' }}
-            className="w-12 h-12 rounded-full border border-borderDark mr-3"
-          />
+          <DefaultAvatar uri={user?.avatar_url} size={48} />
           <View className="p-2 border border-borderDark rounded-full bg-surfaceLight">
             <FontAwesome name="cog" size={16} color="#94A3B8" />
           </View>

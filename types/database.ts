@@ -24,6 +24,8 @@ export interface Appointment {
   id: string;
   patient_id: string;
   doctor_id: string;
+  patient_name?: string;
+  doctor_name?: string;
   status: AppointmentStatus;
   scheduled_at: string;
   symptom_report?: Record<string, any>;
@@ -35,6 +37,8 @@ export interface Prescription {
   id: string;
   patient_id: string;
   doctor_id: string;
+  patient_name?: string;
+  doctor_name?: string;
   appointment_id?: string;
   medication_name: string;
   dosage: string;
