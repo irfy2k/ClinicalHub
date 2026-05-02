@@ -35,8 +35,8 @@ function useProtectedRoute(user: User | null, isLoading: boolean) {
     const inAuthGroup = segments[0] === '(auth)';
 
     if (!user && !inAuthGroup) {
-      // Redirect to the sign-in page.
-      router.replace('/(auth)/login');
+      // Redirect to the welcome screen instead of login directly.
+      router.replace('/(auth)/welcome');
     } else if (user && inAuthGroup) {
       // Redirect away from the sign-in page.
       if (user.role === 'patient') {

@@ -86,7 +86,10 @@ export default function RegisterScreen() {
 
   if (!role) {
     return (
-      <View className="flex-1 bg-background p-6 pt-20">
+      <View className="flex-1 bg-background p-6 pt-16">
+        <TouchableOpacity onPress={() => router.back()} className="mb-6 p-2 self-start -ml-2">
+           <FontAwesome name="arrow-left" size={20} color="#E2E8F0" />
+        </TouchableOpacity>
         <View className="items-center mb-10">
           <Text className="text-2xl font-bold text-textLight mb-3">Clinical Hub</Text>
           <Text className="text-textMuted text-center leading-relaxed">

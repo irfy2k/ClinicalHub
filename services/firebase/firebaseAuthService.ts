@@ -3,6 +3,7 @@ import {
   createUserWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
+  sendPasswordResetEmail,
   User as FirebaseUser,
 } from 'firebase/auth';
 import { ref, set, get, query, orderByChild, equalTo } from 'firebase/database';
@@ -138,6 +139,18 @@ export const firebaseAuthService = {
    */
   async logout(): Promise<void> {
     await signOut(auth);
+  },
+
+  /**
+   * Send a password reset email.
+   */
+  async resetPassword(email: string): Promise<void> {
+    try {
+      await sendPasswordResetEmail(auth, email);
+    } catch (error) {
+      console.error('[Firebase Auth] resetPassword error:', error);
+      throw error;
+    }
   },
 
   /**
