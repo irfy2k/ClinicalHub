@@ -7,7 +7,7 @@ import { chatService } from './mock/mockChatService';
 
 // This file exports the active services. 
 // Right now they map to the mock services. 
-// In Phase 11, we will swap these to export Supabase implementations instead.
+// In the final phase, we will swap these to export Firebase implementations instead.
 
 export const Services = {
   auth: authService,
