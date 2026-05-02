@@ -71,7 +71,7 @@ class NotificationService {
       const tokenData = await Notifications.getExpoPushTokenAsync();
       return tokenData.data;
     } catch (e) {
-      console.warn('Failed to get Expo push token (expected in Expo Go):', e);
+      // Silencing warning in Expo Go to avoid terminal noise.
       return null;
     }
   }

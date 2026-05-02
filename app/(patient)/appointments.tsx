@@ -122,7 +122,12 @@ export default function PatientAppointments() {
         {filteredAppointments.length === 0 ? (
           <View className="items-center justify-center py-20">
             <FontAwesome name="calendar-times-o" size={48} color="#2F333A" />
-            <Text className="text-textMuted mt-4">No appointments found</Text>
+            <Text className="text-textMuted mt-4 mb-6">No appointments found</Text>
+            <Button 
+              label="Find a Specialist" 
+              onPress={() => setIsBooking(true)} 
+              className="w-full max-w-[250px]"
+            />
           </View>
         ) : (
           filteredAppointments.map(appt => (
