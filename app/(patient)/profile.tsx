@@ -85,7 +85,7 @@ export default function PatientProfileScreen() {
             </View>
           </TouchableOpacity>
           <Text className="text-xl font-bold text-textLight">{user?.name}</Text>
-          <Text className="text-textMuted text-sm">Patient ID: {user?.id.substring(0, 8) || 'N/A'}</Text>
+          <Text className="text-textMuted text-sm">Medical Record No: MRN-{user?.id.substring(0, 6).toUpperCase() || 'N/A'}</Text>
         </View>
 
         <Text className="text-textLight font-bold mb-4 uppercase text-xs tracking-wider">Account Details</Text>

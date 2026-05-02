@@ -64,8 +64,8 @@ export default function DoctorAppointments() {
               <View className="flex-row justify-between items-start mb-3">
                 <View>
                   <Text className="text-primary text-xs font-bold uppercase tracking-wider mb-1">{appt.status}</Text>
-                  <Text className="text-textLight font-bold text-lg">Patient ID</Text>
-                  <Text className="text-textMuted text-sm">{appt.patient_id}</Text>
+                  <Text className="text-textLight font-bold text-lg">{appt.patient_name || 'Patient'}</Text>
+                  <Text className="text-textMuted text-sm">MRN-{appt.patient_id.substring(0, 6).toUpperCase()}</Text>
                 </View>
                 <View className="bg-surfaceLight px-3 py-1.5 rounded-lg border border-borderDark items-center">
                   <Text className="text-textLight font-bold">{new Date(appt.scheduled_at).getDate()}</Text>

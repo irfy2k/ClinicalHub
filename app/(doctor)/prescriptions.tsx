@@ -53,8 +53,16 @@ export default function DoctorPrescriptions() {
   };
 
   const loadPatients = async () => {
-    const patients = await firebaseAuthService.getUsersByRole('patient');
-    setPatientUsers(patients);
+    if (!user) return;
+    const [patients, appts] = await Promise.all([
+      firebaseAuthService.getUsersByRole('patient'),
+      Services.appointment.getByDoctor(user.id)
+    ]);
+    
+    // Only show patients that have booked an appointment with this doctor
+    const treatedPatientIds = new Set(appts.map(a => a.patient_id));
+    const treatedPatients = patients.filter(p => treatedPatientIds.has(p.id));
+    setPatientUsers(treatedPatients);
   };
 
   const toggleTime = (time: string) => {
