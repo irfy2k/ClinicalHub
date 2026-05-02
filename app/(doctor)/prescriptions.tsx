@@ -58,7 +58,7 @@ export default function DoctorPrescriptions() {
       firebaseAuthService.getUsersByRole('patient'),
       Services.appointment.getByDoctor(user.id)
     ]);
-    
+
     // Only show patients that have booked an appointment with this doctor
     const treatedPatientIds = new Set(appts.map(a => a.patient_id));
     const treatedPatients = patients.filter(p => treatedPatientIds.has(p.id));
@@ -333,10 +333,10 @@ export default function DoctorPrescriptions() {
             })}
           </View>
 
-          <Button 
-            label="Issue Prescription" 
-            fullWidth 
-            onPress={handleCreate} 
+          <Button
+            label="Issue Prescription"
+            fullWidth
+            onPress={handleCreate}
             disabled={!selectedPatientId || !medName || !dosage || selectedTimes.length === 0}
           />
         </ScrollView>

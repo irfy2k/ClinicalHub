@@ -1,43 +1,81 @@
-# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
-
-# dependencies
+# Dependencies
 node_modules/
+.npm/
 
 # Expo
 .expo/
 dist/
 web-build/
 expo-env.d.ts
+app-env.d.ts
+nativewind-env.d.ts
 
-# Native
-.kotlin/
-*.orig.*
+# Native folders (generated)
+/ios/
+/android/
+
+# Native certificates/keys
 *.jks
 *.p8
 *.p12
 *.key
+*.pem
 *.mobileprovision
+*.orig.*
 
 # Metro
 .metro-health-check*
 
-# debug
+# Environment / Sensitive files
+.env
+.env.*
+*.local
+credentials.json
+google-services.json
+GoogleService-Info.plist
+serviceAccountKey.json
+
+# Debugging and logs
 npm-debug.*
 yarn-debug.*
 yarn-error.*
+*.log
+logs/
+*.log.*
 
-# macOS
-.DS_Store
-*.pem
+# IDEs and Editors
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
 
-# local env files
-.env*.local
+# Documentation and Data (User requested)
+*.md
+*.json
 
-# typescript
+# Exceptions for critical configuration (optional but recommended)
+!package.json
+!package-lock.json
+!app.json
+!tsconfig.json
+
+# TypeScript
 *.tsbuildinfo
 
-app-example
+# OS files
+.DS_Store
+.DS_Store?
+._*
+Thumbs.db
+ehthumbs.db
+Desktop.ini
 
-# generated native folders
-/ios
-/android
+# Redundant/Useless data
+tmp/
+temp/
+build/
+out/
+app-example/
