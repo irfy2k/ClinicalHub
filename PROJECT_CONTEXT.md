@@ -102,4 +102,11 @@ This project is a deterministic healthcare application built for both **Patients
 
 ## 6. Current Status
 **Last Updated:** 2026-05-02
-**Active Phase:** Phase 3 Complete — Firebase integration fully implemented. To activate, set `BACKEND = 'firebase'` in `services/index.ts` and fill in Firebase credentials in `services/firebase/firebaseConfig.ts`.
+**Active Phase:** Phase 3 Complete — App is now actively running on a live Firebase configuration. `BACKEND` is set to `'firebase'` in `services/index.ts`. 
+
+**Pending Refactoring Tasks:**
+- Complete removal of local mock data and `mockUsers` references.
+- Fix avatar placeholders to use default vectors instead of external `pravatar` URLs.
+- Add Pakistani phone number validation on the register screen.
+- Improve Firebase rules and UI state handling for doctor-patient interactions (chat, prescriptions).
+- Comprehensive end-to-end testing of the Firebase implementation.
