@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Alert, Modal, Image } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { Services } from '../../services';
@@ -28,6 +28,7 @@ export default function MedicalVaultScreen() {
   const { user } = useAuth();
   const [documents, setDocuments] = useState<DocumentRecord[]>([]);
   const [activeFilter, setActiveFilter] = useState<FilterKey>('All Records');
+  const [previewDoc, setPreviewDoc] = useState<DocumentRecord | null>(null);
 
   const loadDocuments = useCallback(async () => {
     if (!user) return;
@@ -167,7 +168,7 @@ export default function MedicalVaultScreen() {
                   label="View Report"
                   variant="secondary"
                   className="py-2"
-                  onPress={() => Alert.alert('Preview', `Opening ${doc.file_name} in viewer...`)}
+                  onPress={() => setPreviewDoc(doc)}
                 />
               </View>
             </Card>
@@ -181,6 +182,39 @@ export default function MedicalVaultScreen() {
           </Text>
         </View>
       </ScrollView>
+
+      {/* Preview Modal */}
+      <Modal visible={!!previewDoc} animationType="fade" transparent={true}>
+        <View className="flex-1 bg-black/90 items-center justify-center p-6">
+           <TouchableOpacity 
+             className="absolute top-12 right-6 z-10 w-10 h-10 bg-white/10 rounded-full items-center justify-center"
+             onPress={() => setPreviewDoc(null)}
+           >
+             <FontAwesome name="close" size={20} color="white" />
+           </TouchableOpacity>
+           
+           <View className="w-full h-[70%] bg-surface rounded-3xl overflow-hidden border border-borderDark shadow-2xl">
+             {previewDoc?.storage_path.startsWith('data:') ? (
+               <Image 
+                 source={{ uri: previewDoc.storage_path }} 
+                 style={{ width: '100%', height: '100%' }} 
+                 resizeMode="contain" 
+               />
+             ) : (
+               <View className="flex-1 items-center justify-center p-10">
+                 <FontAwesome name="file-pdf-o" size={60} color="#94A3B8" />
+                 <Text className="text-textLight font-bold text-lg mt-6 text-center">{previewDoc?.file_name}</Text>
+                 <Text className="text-textMuted text-center mt-2">Native PDF rendering is not supported in the web preview, but is fully functional on hardware builds.</Text>
+               </View>
+             )}
+           </View>
+
+           <View className="mt-8 w-full">
+             <Text className="text-white font-bold text-xl mb-1">{previewDoc?.file_name}</Text>
+             <Text className="text-textMuted">{FILE_TYPE_LABELS[previewDoc?.file_type || 'other']} • {formatFileSize(previewDoc?.file_size_bytes)}</Text>
+           </View>
+        </View>
+      </Modal>
 
       {/* Upload FAB */}
       <View className="absolute bottom-6 right-6">

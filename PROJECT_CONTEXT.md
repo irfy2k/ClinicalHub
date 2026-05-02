@@ -10,8 +10,9 @@ This project is a deterministic healthcare application built for both **Patients
 * **Language:** TypeScript
 * **Styling:** NativeWind (Tailwind CSS for React Native) + `constants/theme.ts`
 * **Icons:** `@expo/vector-icons` (FontAwesome)
-* **Backend Strategy:** Currently running on a **Mock Service Layer** (`services/mock/*`), fully abstracted so it can be seamlessly swapped to **Firebase** in the final phase.
-* **Component Library:** Custom-built React Native components (`Button`, `Card`, `Input`, `Avatar`, `Badge`, `PieChart` using `react-native-svg`).
+* **Backend Strategy:** Fully migrated to **Firebase Realtime Database** and **Firebase Auth**.
+* **Storage Solution:** Implemented **Base64 Image Encoding** to store profile pictures, symptom photos, and EHR documents directly as strings in the database, bypassing the need for Firebase Cloud Storage and paid billing plans.
+* **Component Library:** Custom-built React Native components (`Button`, `Card`, `Input`, `Avatar`, `Badge`, `PieChart` using `react-native-svg`). Includes a `DefaultAvatar` system with FontAwesome fallbacks.
 
 ## 3. Directory Architecture
 ```
@@ -36,21 +37,23 @@ This project is a deterministic healthcare application built for both **Patients
   index.ts       # Registration hub. UI components ONLY import from here.
 
 /types
-  database.ts    # TypeScript definitions for expected Firebase DB Schema
+  database.ts    # TypeScript definitions for Firebase DB Schema. Expanded with MRN logic and photo_data.
 ```
 
 ## 4. Completed Features (By Role)
 
 ### 🏥 Patient Interface
-* **Dashboard:** Vitals display with mock editable modal, "Upcoming Care" quick links to workflow hub.
-* **Appointments:** Full booking wizard linking symptoms + pain scale (1-10) directly into a scheduled slot.
-* **EHR (Medical Vault):** Category filtered document view (Labs, Reports, Prescriptions) that parses native file uploads (`expo-image-picker`) locally. 
-* **Medications Tracker:** Live adherence calculator dynamically derived from an internal logging array mapping against daily time slots. Handles "Taken" vs "Skipped".
-* **Finances Ledger:** Custom SVG pie chart rendering categorized medical spending (Consults vs Meds vs Labs). Tracks fully simulated transactional statements.
+* **Dashboard:** Real-time vitals display and a dynamic **Upcoming Care** widget that fetches the actual next scheduled appointment.
+* **Appointments:** Full booking wizard linking symptoms + pain scale (1-10) + **Symptom Photo Upload (Base64)** directly into a scheduled slot.
+* **EHR (Medical Vault):** Category filtered document view with **Real-time Preview Modal** for viewing uploaded Base64 image reports.
+* **Medications Tracker:** Live adherence tracker. Integrated with push notifications and auto-billed by doctors.
+* **Finances Ledger:** Integrated spending tracker. Now automatically generates expenses when doctors issue priced prescriptions.
+* **Identity:** Uses a readable **Medical Record Number (MRN)** format (MRN-XXXXXX) instead of raw UIDs.
 
 ### 🩺 Doctor Interface
-* **Daily Queue:** Main hub. Calculates identical day-of total/waiting patients. Provides an interactive overlay modal routing to messaging, calls, or prescribing functionalities.
-* **Prescriptions:** Integrated tab allowing the localized creation of structured prescriptions targeting unique patients with multi-select delivery schedules. Deep-links from the daily queue parameter pulls.
+* **Daily Queue:** Main hub displaying all **Upcoming** appointments. Optimized to show patients scheduled for tomorrow if current day slots have passed.
+* **Prescriptions:** Integrated tab allowing the creation of structured prescriptions. Restricted to **treated patients only** to ensure medical accuracy. 
+* **Auto-Billing:** Issuing a prescription with a cost estimate automatically injects a billing record into the Patient's finance ledger.
 * **Appointments:** Chronological log overviewing active versus historical bookings alongside basic filter hooks.
 * **Telemedicine:** PIP-style time-gated call initiation screen that blocks entry until 15-minutes prior to slot limits. Currently mimics calls via native URI linking.
 
@@ -97,20 +100,34 @@ This project is a deterministic healthcare application built for both **Patients
 - Updated login/register screens with password field support
 - Updated `types/database.ts` with Firebase schema documentation
 
+### ✅ Phase 3.5 — Clinical Polishing & Production Readiness (COMPLETE)
+- **ID Reform:** Replaced raw Firebase UIDs with readable `MRN-XXXXXX` (Medical Record Number) formats across all screens.
+- **Image Integration:** Implemented Base64 encoding for:
+  - User profile avatars
+  - Symptom photo uploads in Intake Wizard
+  - EHR document uploads
+- **Dashboard Synchronization:** Replaced hardcoded "Dr. Sarah Smith" widget with a real-time `useEffect` hook that fetches the actual next appointment.
+- **Workflow Security:** Restricted the Doctor's prescription list to patients they have an existing appointment record with.
+- **Automated Billing:** Linked the Prescription module to the Finance module. Entering a price for a medicine now auto-generates a patient expense.
+- **UI Feedback:** Added `disabled` state support to the `Button` component. Integrated form validation across all screens to prevent submission of empty or invalid data.
+- **Navigation Stability:** Explicitly defined the `chat/[id]` route in the Root Layout Stack to resolve navigation context errors.
+- **EHR Preview:** Added a Modal-based image previewer to the Medical Vault for instant document viewing.
+
 ### 🔲 Phase 4 — WebRTC Integration (PENDING)
 - Replacing the current dummy telemedicine stub (`tel:` linking / layout shells) with actual active Agora/LiveKit/WebRTC socket stream connection logic
 
 ## 6. Current Status
 **Last Updated:** 2026-05-02
-**Active Phase:** Phase 3 Complete — App is fully migrated to a live Firebase backend. All mock data has been removed.
+**Active Phase:** Phase 3.5 Complete — App is polished, validated, and fully integrated with clinical workflows.
 
 **Completed Refactoring Tasks:**
-- Removed local mock data and `mockUsers` references completely.
-- Replaced `pravatar.cc` URLs with `DefaultAvatar` component using FontAwesome.
-- Added Pakistani phone number validation on the register screen (`+92` format).
-- Denormalized patient and doctor names on prescriptions and appointments.
-- Upgraded the chat feature to use Firebase Realtime listeners instead of polling.
+- Integrated Base64 image storage to bypass Cloud Storage billing requirements.
+- Implemented MRN (Medical Record Number) readable identifiers.
+- Added automated billing (Prescriptions -> Finances).
+- Optimized Doctor Queue for "Upcoming" visibility rather than strictly "Today".
+- Finalized visual feedback/disabled states for all primary action buttons.
 
 **Next Steps:**
-- Follow the Testing Guide in `IMPLEMENTATION_PLAN.md` to verify end-to-end functionality across multiple devices.
 - Phase 4: Implement WebRTC for actual telemedicine video calling.
+- Phase 5: Hardware sensor integration (stubs for vitals sync).
+- User Testing: Conduct a full end-to-end walkthrough from Registration to Final Billing.
