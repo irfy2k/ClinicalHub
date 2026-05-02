@@ -67,8 +67,13 @@ class NotificationService {
       });
     }
 
-    const tokenData = await Notifications.getExpoPushTokenAsync();
-    return tokenData.data;
+    try {
+      const tokenData = await Notifications.getExpoPushTokenAsync();
+      return tokenData.data;
+    } catch (e) {
+      console.warn('Failed to get Expo push token (expected in Expo Go):', e);
+      return null;
+    }
   }
 
   /**
