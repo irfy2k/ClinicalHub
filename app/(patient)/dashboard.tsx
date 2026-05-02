@@ -134,7 +134,12 @@ export default function DashboardScreen() {
               onChangeText={(text) => setEditVitals(prev => ({...prev, spo2: text}))}
             />
 
-            <Button label="Save Vitals" onPress={handleSaveVitals} className="mt-4" />
+            <Button 
+              label="Save Vitals" 
+              onPress={handleSaveVitals} 
+              className="mt-4" 
+              disabled={!editVitals.bp && !editVitals.hr && !editVitals.temp && !editVitals.spo2}
+            />
          </KeyboardAvoidingView>
       </Modal>
 

@@ -314,7 +314,12 @@ export default function DoctorPrescriptions() {
             })}
           </View>
 
-          <Button label="Issue Prescription" fullWidth onPress={handleCreate} />
+          <Button 
+            label="Issue Prescription" 
+            fullWidth 
+            onPress={handleCreate} 
+            disabled={!selectedPatientId || !medName || !dosage || selectedTimes.length === 0}
+          />
         </ScrollView>
       </Modal>
     </View>

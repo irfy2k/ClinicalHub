@@ -91,6 +91,7 @@ export default function LoginScreen() {
             label="Sign In →" 
             fullWidth 
             onPress={handleLogin} 
+            disabled={!email || !password}
           />
         </View>
 

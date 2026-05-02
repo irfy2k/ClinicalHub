@@ -29,10 +29,14 @@ export default function OnboardingScreen() {
   const { updateUser } = useAuth();
   const [selectedConditions, setSelectedConditions] = useState<string[]>([]);
   
-  const { control, handleSubmit, formState: { errors } } = useForm<FormData>({
+  const { control, handleSubmit, watch, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: { height: '', weight: '', bloodType: '', allergies: '' }
   });
+
+  const watchHeight = watch('height');
+  const watchWeight = watch('weight');
+  const watchBloodType = watch('bloodType');
 
   const toggleCondition = (cond: string) => {
     if (selectedConditions.includes(cond)) {
@@ -169,6 +173,7 @@ export default function OnboardingScreen() {
           fullWidth 
           onPress={handleSubmit(onSubmit)} 
           className="mt-4 mb-8"
+          disabled={!watchHeight || !watchWeight || !watchBloodType}
         />
       </ScrollView>
     </KeyboardAvoidingView>

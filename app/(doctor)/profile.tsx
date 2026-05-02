@@ -136,7 +136,12 @@ export default function DoctorProfileScreen() {
            })}
         </View>
 
-        <Button label="Save Configuration" onPress={handleUpdate} className="mt-2" />
+        <Button 
+          label="Save Configuration" 
+          onPress={handleUpdate} 
+          className="mt-2" 
+          disabled={!name || availableTimes.length === 0 || (name === (user?.name || '') && phone === (user?.phone_number || '') && avatar === (user?.avatar_url || '') && JSON.stringify(availableTimes) === JSON.stringify(user?.available_times || ['09:00', '10:00', '14:00']))}
+        />
       </ScrollView>
     </KeyboardAvoidingView>
   );

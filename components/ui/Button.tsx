@@ -29,7 +29,14 @@ export function Button({ label, variant = 'primary', fullWidth = false, classNam
 
   return (
     <TouchableOpacity 
-      className={clsx(baseClasses, widthClass, variants[variant], className)} 
+      className={clsx(
+        baseClasses, 
+        widthClass, 
+        variants[variant], 
+        props.disabled && "opacity-50",
+        className
+      )} 
+      activeOpacity={0.7}
       {...props}
     >
       <Text className={textVariants[variant]}>{label}</Text>

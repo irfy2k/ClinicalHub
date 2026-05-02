@@ -301,7 +301,7 @@ export default function FinancesScreen() {
             onChangeText={setNewDescription}
           />
 
-          <Button label="Save Expense" fullWidth onPress={handleAddExpense} className="mt-4" />
+          <Button label="Save Expense" fullWidth onPress={handleAddExpense} className="mt-4" disabled={!newAmount || !newDescription} />
         </View>
       </Modal>
     </View>

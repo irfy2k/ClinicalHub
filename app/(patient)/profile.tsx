@@ -109,7 +109,12 @@ export default function PatientProfileScreen() {
            keyboardType="phone-pad"
         />
 
-        <Button label="Save Changes" onPress={handleUpdate} className="mt-4" />
+        <Button 
+           label="Save Changes" 
+           onPress={handleUpdate} 
+           className="mt-4" 
+           disabled={!name || (name === (user?.name || '') && phone === (user?.phone_number || '') && avatar === (user?.avatar_url || ''))}
+        />
       </ScrollView>
     </KeyboardAvoidingView>
   );

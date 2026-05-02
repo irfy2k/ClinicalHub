@@ -181,6 +181,7 @@ export default function RegisterScreen() {
             fullWidth 
             onPress={handleRegister} 
             className="mt-4"
+            disabled={!email || !name || !role || !phone || !password || !isValidPakistaniPhone(phone)}
           />
           
           <Button 
