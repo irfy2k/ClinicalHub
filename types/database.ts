@@ -30,6 +30,7 @@ export interface Appointment {
   scheduled_at: string;
   symptom_report?: Record<string, any>;
   notes?: string;
+  photo_data?: string;
   created_at: string;
 }
 

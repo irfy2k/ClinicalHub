@@ -53,18 +53,20 @@ export default function MedicalVaultScreen() {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       quality: 0.8,
+      base64: true,
     });
 
     if (!result.canceled && result.assets[0]) {
       const asset = result.assets[0];
       const fileName = asset.fileName || `document_${Date.now()}.jpg`;
+      const storagePath = asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : asset.uri;
 
       await Services.document.create({
         patient_id: user.id,
         uploaded_by: user.id,
         file_name: fileName,
         file_type: 'other',
-        storage_path: asset.uri,
+        storage_path: storagePath,
         file_size_bytes: asset.fileSize || 0,
       });
 

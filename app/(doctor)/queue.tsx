@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Modal } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Modal, Image } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { Services } from '../../services';
@@ -154,13 +154,16 @@ export default function QueueScreen() {
                  <Text className="text-textMuted text-xs font-bold uppercase tracking-wider mb-2">Pre-consultation details</Text>
                  <Text className="text-textLight leading-5 mb-3">{selectedAppt?.notes}</Text>
                  
-                 <TouchableOpacity 
-                   className="flex-row items-center bg-surface border border-borderDark rounded-lg px-3 py-2 self-start"
-                   onPress={() => alert('View Photo intent: Hardware API to be implemented in Phase 13')}
-                 >
-                   <FontAwesome name="image" size={14} color="#85B523" />
-                   <Text className="text-primary text-sm font-bold ml-2">View Patient Photo</Text>
-                 </TouchableOpacity>
+                 {selectedAppt?.photo_data && (
+                   <View className="mt-4">
+                     <Text className="text-textMuted text-xs font-bold uppercase tracking-wider mb-2">Patient Uploaded Photo</Text>
+                     <Image 
+                       source={{ uri: selectedAppt.photo_data }} 
+                       style={{ width: '100%', height: 200, borderRadius: 8, borderWidth: 1, borderColor: '#2F333A' }} 
+                       resizeMode="cover"
+                     />
+                   </View>
+                 )}
               </View>
 
               <View className="flex-row items-center">

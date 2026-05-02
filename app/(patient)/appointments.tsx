@@ -68,7 +68,8 @@ export default function PatientAppointments() {
       doctor_name: wizardDoctorName,
       status: 'pending',
       scheduled_at: scheduledAt,
-      notes: `Symptoms: ${intakeData.symptoms} | Pain: ${intakeData.painLevel}/10 | Duration: ${intakeData.duration} | Slot: ${wizardTargetTime}`
+      notes: `Symptoms: ${intakeData.symptoms} | Pain: ${intakeData.painLevel}/10 | Duration: ${intakeData.duration} | Slot: ${wizardTargetTime}`,
+      photo_data: intakeData.photoData || undefined
     });
 
     // Schedule a push notification reminder 30 minutes before the appointment

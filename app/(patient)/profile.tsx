@@ -40,9 +40,11 @@ export default function PatientProfileScreen() {
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.5,
+      base64: true,
     });
     if (!result.canceled && result.assets[0]) {
-      setAvatar(result.assets[0].uri);
+      const asset = result.assets[0];
+      setAvatar(asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : asset.uri);
     }
   };
 
@@ -51,9 +53,11 @@ export default function PatientProfileScreen() {
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.5,
+      base64: true,
     });
     if (!result.canceled && result.assets[0]) {
-      setAvatar(result.assets[0].uri);
+      const asset = result.assets[0];
+      setAvatar(asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : asset.uri);
     }
   };
 

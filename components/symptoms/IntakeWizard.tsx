@@ -4,6 +4,8 @@ import { PainScale } from './PainScale';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { FontAwesome } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
+import { Image } from 'react-native';
 
 interface IntakeWizardProps {
   visible: boolean;
@@ -16,6 +18,8 @@ export function IntakeWizard({ visible, onClose, onComplete }: IntakeWizardProps
   const [symptoms, setSymptoms] = useState('');
   const [painLevel, setPainLevel] = useState(0);
   const [duration, setDuration] = useState('');
+  const [photoUri, setPhotoUri] = useState<string | null>(null);
+  const [photoBase64, setPhotoBase64] = useState<string | null>(null);
 
   const handleNext = () => {
     if (step < 3) {
@@ -24,13 +28,29 @@ export function IntakeWizard({ visible, onClose, onComplete }: IntakeWizardProps
       onComplete({
         symptoms,
         painLevel,
-        duration
+        duration,
+        photoData: photoBase64 ? `data:image/jpeg;base64,${photoBase64}` : null
       });
       // reset state after submission
       setStep(1);
       setSymptoms('');
       setPainLevel(0);
       setDuration('');
+      setPhotoUri(null);
+      setPhotoBase64(null);
+    }
+  };
+
+  const pickImage = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      quality: 0.5,
+      base64: true,
+    });
+
+    if (!result.canceled && result.assets[0]) {
+      setPhotoUri(result.assets[0].uri);
+      setPhotoBase64(result.assets[0].base64 || null);
     }
   };
 
@@ -89,9 +109,18 @@ export function IntakeWizard({ visible, onClose, onComplete }: IntakeWizardProps
               />
               
               <Text className="text-textLight font-bold mt-4 mb-2">Photo Reference (Optional)</Text>
-              <TouchableOpacity className="w-full h-32 border-2 border-dashed border-borderDark rounded-xl items-center justify-center bg-surfaceLight">
-                <FontAwesome name="camera" size={32} color="#94A3B8" />
-                <Text className="text-textMuted mt-2 font-semibold">Tap to upload photo</Text>
+              <TouchableOpacity 
+                className="w-full h-32 border-2 border-dashed border-borderDark rounded-xl items-center justify-center bg-surfaceLight overflow-hidden"
+                onPress={pickImage}
+              >
+                {photoUri ? (
+                  <Image source={{ uri: photoUri }} style={{ width: '100%', height: '100%' }} />
+                ) : (
+                  <>
+                    <FontAwesome name="camera" size={32} color="#94A3B8" />
+                    <Text className="text-textMuted mt-2 font-semibold">Tap to upload photo</Text>
+                  </>
+                )}
               </TouchableOpacity>
             </View>
           )}
