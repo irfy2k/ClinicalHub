@@ -8,6 +8,7 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Card } from '../../components/ui/Card';
 import { IntakeWizard } from '../../components/symptoms/IntakeWizard';
+import { notificationService } from '../../services/notificationService';
 import clsx from 'clsx';
 import { useRouter } from 'expo-router';
 
@@ -42,13 +43,29 @@ export default function PatientAppointments() {
     const today = new Date();
     // Defaulting to "tomorrow" if needed, or today based on original code mockup
     
+    const scheduledAt = new Date(Date.now() + 86400000).toISOString(); // Mock tomorrow
+    
     await Services.appointment.create({
       patient_id: user.id,
       doctor_id: wizardTargetDoctor,
       status: 'pending',
-      scheduled_at: new Date(Date.now() + 86400000).toISOString(), // Mock tomorrow regardless of exact slot for simplicity
+      scheduled_at: scheduledAt,
       notes: `Symptoms: ${intakeData.symptoms} | Pain: ${intakeData.painLevel}/10 | Duration: ${intakeData.duration} | Slot: ${wizardTargetTime}`
     });
+
+    // Schedule a push notification reminder 30 minutes before the appointment
+    await notificationService.scheduleAppointmentReminder(
+      `appt-${Date.now()}`,
+      'Dr. Sarah Jenkins',
+      scheduledAt
+    );
+
+    // Confirm booking with an instant notification
+    await notificationService.sendInstantNotification(
+      '📅 Appointment Booked',
+      `Your appointment for ${wizardTargetTime} has been confirmed. You\'ll be reminded 30 minutes before.`
+    );
+
     setWizardTargetDoctor(null);
     setWizardTargetTime(null);
     setIsBooking(false);

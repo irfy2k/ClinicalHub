@@ -6,6 +6,7 @@ import { Services } from '../../services';
 import { Appointment } from '../../types/database';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
+import { notificationService } from '../../services/notificationService';
 import clsx from 'clsx';
 import { useRouter } from 'expo-router';
 
@@ -28,6 +29,22 @@ export default function QueueScreen() {
   const handleStatusChange = async (status: Appointment['status']) => {
     if (!selectedAppt) return;
     await Services.appointment.updateStatus(selectedAppt.id, status);
+
+    // Send a notification about the status change
+    const statusMessages: Record<string, { title: string; body: string }> = {
+      confirmed: { title: '✅ Appointment Confirmed', body: `Your appointment has been confirmed by ${user?.name || 'your doctor'}.` },
+      completed: { title: '🏥 Visit Complete', body: `Your appointment with ${user?.name || 'your doctor'} has been marked as completed.` },
+      cancelled: { title: '❌ Appointment Cancelled', body: `Your appointment with ${user?.name || 'your doctor'} has been cancelled.` },
+    };
+    const msg = statusMessages[status];
+    if (msg) {
+      await notificationService.sendInstantNotification(msg.title, msg.body, {
+        type: 'appointment_status',
+        appointmentId: selectedAppt.id,
+        status,
+      });
+    }
+
     setSelectedAppt(null);
     loadAppointments();
   };

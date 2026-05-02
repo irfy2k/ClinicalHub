@@ -8,6 +8,7 @@ import { Prescription } from '../../types/database';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
+import { notificationService } from '../../services/notificationService';
 import { mockUsers } from '../../services/mock/mockData';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 
@@ -73,7 +74,7 @@ export default function DoctorPrescriptions() {
       return;
     }
 
-    await Services.prescription.create({
+    const newPrescription = await Services.prescription.create({
       patient_id: selectedPatientId,
       doctor_id: user.id,
       medication_name: medName,
@@ -85,10 +86,20 @@ export default function DoctorPrescriptions() {
       is_active: true,
     });
 
+    // Schedule medication reminders for the new prescription
+    await notificationService.scheduleMedicationReminders(newPrescription);
+
+    // Send confirmation notification
+    const patientName = mockUsers.find(u => u.id === selectedPatientId)?.name || 'Patient';
+    await notificationService.sendInstantNotification(
+      '💊 New Prescription Issued',
+      `${medName} (${dosage}) has been prescribed to ${patientName}. Reminders have been scheduled.`
+    );
+
     resetForm();
     setIsCreating(false);
     loadPrescriptions();
-    Alert.alert('Success', 'Prescription created successfully.');
+    Alert.alert('Success', 'Prescription created and reminders scheduled.');
   };
 
   const patientUsers = mockUsers.filter(u => u.role === 'patient');

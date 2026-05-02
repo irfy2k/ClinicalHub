@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Alert, Switch } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { Services } from '../../services';
 import { Prescription, MedicationLog } from '../../types/database';
 import { Card } from '../../components/ui/Card';
+import { notificationService } from '../../services/notificationService';
 import clsx from 'clsx';
 
 interface TimelineEntry {
@@ -21,6 +22,7 @@ export default function MedicationsScreen() {
   const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
   const [logs, setLogs] = useState<MedicationLog[]>([]);
   const [timeline, setTimeline] = useState<TimelineEntry[]>([]);
+  const [remindersEnabled, setRemindersEnabled] = useState(true);
 
   const loadData = useCallback(async () => {
     if (!user) return;
@@ -62,7 +64,12 @@ export default function MedicationsScreen() {
     // Sort by time
     todayEntries.sort((a, b) => a.scheduledTime.localeCompare(b.scheduledTime));
     setTimeline(todayEntries);
-  }, [user]);
+
+    // Schedule medication reminders if enabled
+    if (remindersEnabled) {
+      await notificationService.scheduleAllMedicationReminders(prescData);
+    }
+  }, [user, remindersEnabled]);
 
   useEffect(() => {
     loadData();
@@ -92,8 +99,27 @@ export default function MedicationsScreen() {
       logged_at: `${today}T${entry.scheduledTime}:00.000Z`,
     });
 
+    // Show confirmation notification
+    if (newStatus === 'taken') {
+      await notificationService.sendInstantNotification(
+        '✅ Medication Logged',
+        `${entry.medicationName} (${entry.dosage}) marked as taken.`
+      );
+    }
+
     // Refresh data
     loadData();
+  };
+
+  const handleToggleReminders = async (enabled: boolean) => {
+    setRemindersEnabled(enabled);
+    if (enabled) {
+      await notificationService.scheduleAllMedicationReminders(prescriptions);
+      Alert.alert('Reminders Enabled', 'You will receive medication reminders at each scheduled time.');
+    } else {
+      await notificationService.cancelAllNotifications();
+      Alert.alert('Reminders Disabled', 'All medication reminders have been cancelled.');
+    }
   };
 
   // Calculate adherence based accurately on all historical logs vs total tracked
@@ -133,6 +159,25 @@ export default function MedicationsScreen() {
                   : "Your adherence is low. Please take your medications as prescribed."}
             </Text>
           </View>
+        </Card>
+
+        {/* Notification Toggle */}
+        <Card className="flex-row items-center justify-between p-4 bg-surfaceLight border-borderDark mb-4">
+          <View className="flex-row items-center flex-1">
+            <View className="w-10 h-10 rounded-full bg-primary/20 items-center justify-center mr-3">
+              <FontAwesome name="bell" size={16} color="#85B523" />
+            </View>
+            <View className="flex-1">
+              <Text className="text-textLight font-bold">Push Reminders</Text>
+              <Text className="text-textMuted text-xs">Get notified at each scheduled dose</Text>
+            </View>
+          </View>
+          <Switch
+            value={remindersEnabled}
+            onValueChange={handleToggleReminders}
+            trackColor={{ false: '#2F333A', true: '#85B52350' }}
+            thumbColor={remindersEnabled ? '#85B523' : '#94A3B8'}
+          />
         </Card>
 
         <Text className="text-textLight font-bold mt-4 mb-2">Today's Schedule</Text>
