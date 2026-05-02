@@ -105,6 +105,17 @@ export default function DoctorPrescriptions() {
       is_active: true,
     });
 
+    // Automatically generate a health expense for the patient if a cost was entered
+    if (costEstimate && parseFloat(costEstimate) > 0) {
+      await Services.finance.addExpense({
+        patient_id: selectedPatientId,
+        expense_type: 'medication',
+        amount: parseFloat(costEstimate),
+        description: `Prescription: ${medName} (${dosage}) - Prescribed by ${user.name}`,
+        date_incurred: new Date().toISOString()
+      });
+    }
+
     // Schedule medication reminders for the new prescription
     await notificationService.scheduleMedicationReminders(newPrescription);
 
