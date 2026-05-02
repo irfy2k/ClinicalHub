@@ -81,16 +81,25 @@ This project is a deterministic healthcare application built for both **Patients
 - Doctor Queue: fires status notifications on confirm/complete/cancel
 - Doctor Prescriptions: auto-schedules reminders on new prescription creation
 
-### 🔲 Phase 3 — Firebase Integration (PENDING)
-- **Firebase Auth:** Replace mock auth with Firebase Authentication (email/password)
-- **Firebase Realtime Database:** Replace `services/mock/*` arrays with live Firebase Realtime Database endpoints inside `services/firebase/*`
-- Map to `users`, `appointments`, `prescriptions`, `medication_logs`, `health_expenses`, and `chat_messages` collections
-- **Firebase Storage:** Establish storage bucket handling physical file payloads currently mocked by the image picker
-- Implement proper security rules isolating multi-tenant data
+### ✅ Phase 3 — Firebase Integration (COMPLETE)
+- Installed `firebase` and `@react-native-async-storage/async-storage`
+- Created `services/firebase/firebaseConfig.ts` with Auth, Realtime Database, and Storage initialization
+- Implemented 6 Firebase service modules matching mock service interfaces:
+  - `firebaseAuthService`: email/password login, register, profile CRUD, `onAuthStateChanged`
+  - `firebaseAppointmentService`: CRUD with indexed `patient_id`/`doctor_id` queries
+  - `firebasePrescriptionService`: CRUD for prescriptions + medication logs with upsert
+  - `firebaseExpenseService`: patient-scoped health expense CRUD
+  - `firebaseDocumentService`: EHR document CRUD
+  - `firebaseChatService`: appointment-linked messaging with chronological sort
+- Created `services/index.ts` backend toggle (`BACKEND = 'mock' | 'firebase'`)
+- Added `firebase-database-rules.json` with multi-tenant security rules and indexes
+- Updated AuthContext with optional password support for Firebase auth
+- Updated login/register screens with password field support
+- Updated `types/database.ts` with Firebase schema documentation
 
-### 🔲 Phase 4 — WebRTC Integration (PENDING)  
+### 🔲 Phase 4 — WebRTC Integration (PENDING)
 - Replacing the current dummy telemedicine stub (`tel:` linking / layout shells) with actual active Agora/LiveKit/WebRTC socket stream connection logic
 
 ## 6. Current Status
-**Last Updated:** 2026-05-02  
-**Active Phase:** Phase 2 — Starting Push Notifications implementation
+**Last Updated:** 2026-05-02
+**Active Phase:** Phase 3 Complete — Firebase integration fully implemented. To activate, set `BACKEND = 'firebase'` in `services/index.ts` and fill in Firebase credentials in `services/firebase/firebaseConfig.ts`.
