@@ -4,4 +4,4 @@ export { firebasePrescriptionService } from './firebasePrescriptionService';
 export { firebaseExpenseService } from './firebaseExpenseService';
 export { firebaseDocumentService } from './firebaseDocumentService';
 export { firebaseChatService } from './firebaseChatService';
-export { auth, database, storage } from './firebaseConfig';
+export { auth, database /*, storage */ } from './firebaseConfig';
