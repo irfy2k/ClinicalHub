@@ -11,6 +11,51 @@ import { auth, database } from './firebaseConfig';
 import { User } from '../../types/database';
 
 /**
+ * Parses Firebase Auth error codes into human-readable messages.
+ */
+function parseAuthError(error: any): Error {
+  const code = error?.code || '';
+  let message = 'An unexpected authentication error occurred. Please try again.';
+  
+  switch (code) {
+    case 'auth/invalid-email':
+      message = 'The email address is improperly formatted.';
+      break;
+    case 'auth/user-disabled':
+      message = 'This account has been disabled by an administrator.';
+      break;
+    case 'auth/user-not-found':
+      message = 'No account found with this email address.';
+      break;
+    case 'auth/wrong-password':
+    case 'auth/invalid-credential':
+      message = 'Invalid email or password. Please try again.';
+      break;
+    case 'auth/email-already-in-use':
+      message = 'An account already exists with this email address.';
+      break;
+    case 'auth/weak-password':
+      message = 'The password is too weak. Please use at least 6 characters.';
+      break;
+    case 'auth/missing-password':
+      message = 'Please enter your password.';
+      break;
+    case 'auth/network-request-failed':
+      message = 'Network error. Please check your internet connection and try again.';
+      break;
+    case 'auth/too-many-requests':
+      message = 'Too many failed attempts. Please try again later or reset your password.';
+      break;
+    default:
+      if (error?.message) {
+         message = error.message.replace(/Firebase:\s*(Error\s*)?/, '').replace(/\(auth\/.*\)\.?/, '').trim();
+      }
+  }
+  
+  return new Error(message);
+}
+
+/**
  * Firebase Auth Service
  * Handles authentication and user profile management via Firebase Auth + Realtime Database.
  */
@@ -35,7 +80,7 @@ export const firebaseAuthService = {
       return null;
     } catch (error) {
       console.error('[Firebase Auth] Login error:', error);
-      throw error;
+      throw parseAuthError(error);
     }
   },
 
@@ -70,7 +115,7 @@ export const firebaseAuthService = {
       return newUser;
     } catch (error) {
       console.error('[Firebase Auth] Register error:', error);
-      throw error;
+      throw parseAuthError(error);
     }
   },
 
@@ -149,7 +194,7 @@ export const firebaseAuthService = {
       await sendPasswordResetEmail(auth, email);
     } catch (error) {
       console.error('[Firebase Auth] resetPassword error:', error);
-      throw error;
+      throw parseAuthError(error);
     }
   },
 
