@@ -13,6 +13,7 @@ export default function RegisterScreen() {
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
+  const [password, setPassword] = useState('');
   const [role, setRole] = useState<UserRole | null>(null);
   const [error, setError] = useState('');
   
@@ -21,7 +22,7 @@ export default function RegisterScreen() {
 
   const handleRegister = async () => {
     setError('');
-    if (!email || !name || !role || !phone) {
+    if (!email || !name || !role || !phone || !password) {
       setError('Please fill in all fields and select a role');
       return;
     }
@@ -32,7 +33,7 @@ export default function RegisterScreen() {
         name,
         role,
         phone_number: phone
-      });
+      }, password);
       if (role === 'patient') {
         router.push('/(auth)/onboarding');
       }
@@ -118,7 +119,15 @@ export default function RegisterScreen() {
             onChangeText={setPhone}
             keyboardType="phone-pad"
           />
-          
+          <Input
+            label="Password"
+            placeholder="••••••••"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+            autoCapitalize="none"
+          />
+
           {error ? <Text className="text-red-500 text-sm mt-1 mb-4">{error}</Text> : null}
           
           <Button 

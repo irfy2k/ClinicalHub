@@ -6,8 +6,8 @@ import { Services } from '../services';
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
-  login: (email: string) => Promise<void>;
-  register: (data: Omit<User, 'id' | 'created_at'>) => Promise<void>;
+  login: (email: string, password?: string) => Promise<void>;
+  register: (data: Omit<User, 'id' | 'created_at'>, password?: string) => Promise<void>;
   logout: () => Promise<void>;
   updateUser: (updates: Partial<User>) => void;
 }
@@ -61,14 +61,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // In a real app we would check secure storage for session here
+  // In a real app we would check secure storage for session here.
+  // When using Firebase backend, onAuthStateChanged handles session restoration.
   useEffect(() => {
     setIsLoading(false);
   }, []);
 
   useProtectedRoute(user, isLoading);
 
-  const login = async (email: string) => {
+  const login = async (email: string, password?: string) => {
     setIsLoading(true);
     try {
       const u = await Services.auth.login(email);
@@ -79,7 +80,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const register = async (data: Omit<User, 'id' | 'created_at'>) => {
+  const register = async (data: Omit<User, 'id' | 'created_at'>, password?: string) => {
     setIsLoading(true);
     try {
       const u = await Services.auth.register(data);

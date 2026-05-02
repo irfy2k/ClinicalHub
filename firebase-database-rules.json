@@ -1,0 +1,52 @@
+{
+  "rules": {
+    "users": {
+      "$uid": {
+        ".read": "auth != null && (auth.uid === $uid || root.child('users').child(auth.uid).child('role').val() === 'doctor')",
+        ".write": "auth != null && auth.uid === $uid"
+      }
+    },
+    "appointments": {
+      ".indexOn": ["patient_id", "doctor_id"],
+      "$appointmentId": {
+        ".read": "auth != null && (data.child('patient_id').val() === auth.uid || data.child('doctor_id').val() === auth.uid)",
+        ".write": "auth != null && (data.child('patient_id').val() === auth.uid || data.child('doctor_id').val() === auth.uid || !data.exists())"
+      }
+    },
+    "prescriptions": {
+      ".indexOn": ["patient_id", "doctor_id"],
+      "$prescriptionId": {
+        ".read": "auth != null && (data.child('patient_id').val() === auth.uid || data.child('doctor_id').val() === auth.uid)",
+        ".write": "auth != null && (data.child('doctor_id').val() === auth.uid || !data.exists())"
+      }
+    },
+    "medication_logs": {
+      ".indexOn": ["prescription_id"],
+      "$logId": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      }
+    },
+    "health_expenses": {
+      ".indexOn": ["patient_id"],
+      "$expenseId": {
+        ".read": "auth != null && data.child('patient_id').val() === auth.uid",
+        ".write": "auth != null && (data.child('patient_id').val() === auth.uid || !data.exists())"
+      }
+    },
+    "documents": {
+      ".indexOn": ["patient_id"],
+      "$docId": {
+        ".read": "auth != null && (data.child('patient_id').val() === auth.uid || data.child('uploaded_by').val() === auth.uid)",
+        ".write": "auth != null && (data.child('patient_id').val() === auth.uid || data.child('uploaded_by').val() === auth.uid || !data.exists())"
+      }
+    },
+    "chat_messages": {
+      ".indexOn": ["appointment_id"],
+      "$messageId": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      }
+    }
+  }
+}

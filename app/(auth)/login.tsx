@@ -20,7 +20,7 @@ export default function LoginScreen() {
     }
     
     try {
-      await login(email);
+      await login(email, password);
     } catch (e: any) {
       setError(e.message || 'Failed to login');
     }

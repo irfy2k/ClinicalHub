@@ -1,3 +1,9 @@
+/**
+ * Database Schema Types
+ * These TypeScript interfaces define the shape of data stored in Firebase Realtime Database.
+ * Collections: users, appointments, prescriptions, medication_logs, health_expenses, documents, chat_messages
+ */
+
 export type UserRole = 'patient' | 'doctor';
 
 export interface User {

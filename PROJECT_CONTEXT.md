@@ -68,10 +68,18 @@ This project is a deterministic healthcare application built for both **Patients
 - Chat messaging system
 - Custom UI component library
 
-### 🔲 Phase 2 — Push Notifications (PENDING)
-- Install and integrate `expo-notifications`
-- Handle background/local alerts bridging individual prescription arrays against scheduled triggers natively
-- Notification preferences in profile screens
+### ✅ Phase 2 — Push Notifications (COMPLETE)
+- Installed `expo-notifications` and `expo-device`
+- Created `services/notificationService.ts` singleton with full API:
+  - Daily repeating medication reminders per prescription schedule_time
+  - One-shot appointment reminders (30 minutes before)
+  - Instant notification API for status updates and confirmations
+  - Android notification channels (medication-reminders, appointments)
+- Root layout requests permissions on launch with foreground/tap listeners
+- Medications screen: toggle switch for enabling/disabling reminders, auto-schedules on load
+- Appointments: booking confirmation + 30min-before reminder on new appointment
+- Doctor Queue: fires status notifications on confirm/complete/cancel
+- Doctor Prescriptions: auto-schedules reminders on new prescription creation
 
 ### 🔲 Phase 3 — Firebase Integration (PENDING)
 - **Firebase Auth:** Replace mock auth with Firebase Authentication (email/password)
