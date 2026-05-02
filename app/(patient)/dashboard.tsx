@@ -19,6 +19,26 @@ export default function DashboardScreen() {
     temp: '98.6',
     spo2: '99'
   });
+  const [nextAppt, setNextAppt] = useState<any>(null);
+
+  useEffect(() => {
+    const loadNextAppt = async () => {
+      if (!user) return;
+      const { Services } = await import('../../services');
+      const data = await Services.appointment.getByPatient(user.id);
+      
+      const upcoming = data
+        .filter(a => a.status === 'pending' || a.status === 'confirmed')
+        .sort((a, b) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime());
+        
+      if (upcoming.length > 0) {
+        setNextAppt(upcoming[0]);
+      } else {
+        setNextAppt(null);
+      }
+    };
+    loadNextAppt();
+  }, [user]);
 
   const [editVitals, setEditVitals] = useState(vitals);
 
@@ -155,12 +175,24 @@ export default function DashboardScreen() {
           onPress={() => router.push('/(patient)/appointments')}
         >
           <View className="flex-1 mr-4">
-             <Text className="text-textMuted text-xs font-bold tracking-wider mb-2 uppercase">Next Appointment</Text>
-             <Text className="text-textLight font-bold text-lg mb-1">Dr. Sarah Smith</Text>
-             <Text className="text-primary text-sm font-semibold">Tomorrow, 10:00 AM</Text>
+             {nextAppt ? (
+               <>
+                 <Text className="text-textMuted text-xs font-bold tracking-wider mb-2 uppercase">Next Appointment</Text>
+                 <Text className="text-textLight font-bold text-lg mb-1">{nextAppt.doctor_name || 'Your Doctor'}</Text>
+                 <Text className="text-primary text-sm font-semibold">
+                   {new Date(nextAppt.scheduled_at).toLocaleDateString()} at {new Date(nextAppt.scheduled_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                 </Text>
+               </>
+             ) : (
+               <>
+                 <Text className="text-textMuted text-xs font-bold tracking-wider mb-2 uppercase">No Upcoming Care</Text>
+                 <Text className="text-textLight font-bold text-lg mb-1">Book an appointment</Text>
+                 <Text className="text-textMuted text-sm font-semibold">Tap here to find a specialist</Text>
+               </>
+             )}
           </View>
           <View className="w-12 h-12 bg-surface rounded-full items-center justify-center border border-borderDark">
-             <FontAwesome name="chevron-right" size={16} color="#94A3B8" />
+             <FontAwesome name={nextAppt ? "chevron-right" : "plus"} size={16} color="#94A3B8" />
           </View>
         </TouchableOpacity>
       </View>

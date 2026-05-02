@@ -67,7 +67,9 @@ export default function QueueScreen() {
     loadAppointments();
   };
 
-  const todayAppts = appointments.filter(a => new Date(a.scheduled_at).toDateString() === new Date().toDateString());
+  const upcomingAppts = appointments
+    .filter(a => a.status === 'pending' || a.status === 'confirmed')
+    .sort((a, b) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime());
 
   const getPatientName = (patientId: string) => patientNames[patientId] || 'Loading...';
 
@@ -87,25 +89,25 @@ export default function QueueScreen() {
         <View className="flex-row gap-4 mb-4">
           <Card className="flex-1 bg-surface py-4 px-4 items-center">
             <Text className="text-textMuted text-xs font-bold uppercase tracking-wider mb-2">Total</Text>
-            <Text className="text-textLight font-bold text-3xl">{todayAppts.length}</Text>
+            <Text className="text-textLight font-bold text-3xl">{upcomingAppts.length}</Text>
           </Card>
           <Card className="flex-1 bg-surface py-4 px-4 items-center">
-            <Text className="text-textMuted text-xs font-bold uppercase tracking-wider mb-2">Waiting</Text>
-            <Text className="text-primary font-bold text-3xl">{todayAppts.filter(a => a.status === 'pending' || a.status === 'confirmed').length}</Text>
+            <Text className="text-textMuted text-xs font-bold uppercase tracking-wider mb-2">Needs Action</Text>
+            <Text className="text-primary font-bold text-3xl">{upcomingAppts.filter(a => a.status === 'pending').length}</Text>
           </Card>
         </View>
 
-        <Text className="text-textLight font-bold mt-4 mb-2">Daily Queue</Text>
+        <Text className="text-textLight font-bold mt-4 mb-2">Your Upcoming Queue</Text>
       </View>
 
       <ScrollView contentContainerStyle={{ padding: 24, paddingTop: 4 }}>
-        {todayAppts.length === 0 ? (
+        {upcomingAppts.length === 0 ? (
           <View className="items-center justify-center py-20">
             <FontAwesome name="calendar-check-o" size={48} color="#2F333A" />
-            <Text className="text-textMuted mt-4">No appointments scheduled for today</Text>
+            <Text className="text-textMuted mt-4">No upcoming appointments</Text>
           </View>
         ) : (
-          todayAppts.map(appt => (
+          upcomingAppts.map(appt => (
             <TouchableOpacity key={appt.id} onPress={() => setSelectedAppt(appt)}>
               <Card className="mb-4 flex-row items-center justify-between">
                 <View className="flex-row items-center">
