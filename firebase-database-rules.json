@@ -1,50 +1,51 @@
 {
   "rules": {
     "users": {
+      ".read": "auth != null",
+      ".indexOn": ["role"],
       "$uid": {
-        ".read": "auth != null && (auth.uid === $uid || root.child('users').child(auth.uid).child('role').val() === 'doctor')",
         ".write": "auth != null && auth.uid === $uid"
       }
     },
     "appointments": {
+      ".read": "auth != null",
       ".indexOn": ["patient_id", "doctor_id"],
       "$appointmentId": {
-        ".read": "auth != null && (data.child('patient_id').val() === auth.uid || data.child('doctor_id').val() === auth.uid)",
-        ".write": "auth != null && (data.child('patient_id').val() === auth.uid || data.child('doctor_id').val() === auth.uid || !data.exists())"
+        ".write": "auth != null"
       }
     },
     "prescriptions": {
+      ".read": "auth != null",
       ".indexOn": ["patient_id", "doctor_id"],
       "$prescriptionId": {
-        ".read": "auth != null && (data.child('patient_id').val() === auth.uid || data.child('doctor_id').val() === auth.uid)",
-        ".write": "auth != null && (data.child('doctor_id').val() === auth.uid || !data.exists())"
+        ".write": "auth != null"
       }
     },
     "medication_logs": {
+      ".read": "auth != null",
       ".indexOn": ["prescription_id"],
       "$logId": {
-        ".read": "auth != null",
         ".write": "auth != null"
       }
     },
     "health_expenses": {
+      ".read": "auth != null",
       ".indexOn": ["patient_id"],
       "$expenseId": {
-        ".read": "auth != null && data.child('patient_id').val() === auth.uid",
-        ".write": "auth != null && (data.child('patient_id').val() === auth.uid || !data.exists())"
+        ".write": "auth != null"
       }
     },
     "documents": {
+      ".read": "auth != null",
       ".indexOn": ["patient_id"],
       "$docId": {
-        ".read": "auth != null && (data.child('patient_id').val() === auth.uid || data.child('uploaded_by').val() === auth.uid)",
-        ".write": "auth != null && (data.child('patient_id').val() === auth.uid || data.child('uploaded_by').val() === auth.uid || !data.exists())"
+        ".write": "auth != null"
       }
     },
     "chat_messages": {
+      ".read": "auth != null",
       ".indexOn": ["appointment_id"],
       "$messageId": {
-        ".read": "auth != null",
         ".write": "auth != null"
       }
     }
