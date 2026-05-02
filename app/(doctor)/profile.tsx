@@ -116,7 +116,6 @@ export default function DoctorProfileScreen() {
            value={phone}
            onChangeText={setPhone}
            keyboardType="phone-pad"
-           placeholder="+92 3XX-XXXXXXX"
         />
 
         <Text className="text-textLight font-bold mb-2 uppercase text-xs tracking-wider mt-4">Working Hours (30min Blocks)</Text>

@@ -107,7 +107,6 @@ export default function PatientProfileScreen() {
            value={phone}
            onChangeText={setPhone}
            keyboardType="phone-pad"
-           placeholder="+92 3XX-XXXXXXX"
         />
 
         <Button label="Save Changes" onPress={handleUpdate} className="mt-4" />

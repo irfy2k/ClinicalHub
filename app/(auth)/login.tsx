@@ -49,7 +49,7 @@ export default function LoginScreen() {
         <View className="mb-6">
           <Input
             label="Work Email"
-            placeholder="dr.smith@clinic.com"
+            placeholder="name@example.com"
             value={email}
             onChangeText={setEmail}
             keyboardType="email-address"

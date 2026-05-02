@@ -10,22 +10,32 @@ import clsx from 'clsx';
 import { FontAwesome } from '@expo/vector-icons';
 
 /**
- * Formats a raw numeric input into Pakistani phone format: 03XX-XXXXXXX
- * Strips non-digit characters, enforces max 11 digits, inserts dash after 4th digit.
+ * Formats a raw numeric input into Pakistani phone format: +92 XXX XXXXXXX
  */
 function formatPakistaniPhone(raw: string): string {
-  const digits = raw.replace(/\D/g, '').slice(0, 11);
-  if (digits.length <= 4) return digits;
-  return `${digits.slice(0, 4)}-${digits.slice(4)}`;
+  // Strip everything except digits
+  let digits = raw.replace(/\D/g, '');
+  
+  // Remove leading 92 or 0
+  if (digits.startsWith('92')) {
+    digits = digits.substring(2);
+  } else if (digits.startsWith('0')) {
+    digits = digits.substring(1);
+  }
+  
+  digits = digits.slice(0, 10);
+  
+  if (digits.length === 0) return '+92 ';
+  if (digits.length <= 3) return `+92 ${digits}`;
+  return `+92 ${digits.slice(0, 3)} ${digits.slice(3)}`;
 }
 
 /**
  * Validates a Pakistani phone number.
- * Accepts: 03XX-XXXXXXX, 03XXXXXXXXX, +923XXXXXXXXX, 00923XXXXXXXXX
  */
 function isValidPakistaniPhone(phone: string): boolean {
-  const cleaned = phone.replace(/[\s-]/g, '');
-  return /^((\+92|0092)3\d{9}|03\d{9})$/.test(cleaned);
+  const cleaned = phone.replace(/[\s]/g, '');
+  return /^\+923\d{9}$/.test(cleaned);
 }
 
 export default function RegisterScreen() {
@@ -52,12 +62,12 @@ export default function RegisterScreen() {
 
     // Validate Pakistani phone number
     if (!isValidPakistaniPhone(phone)) {
-      setError('Please enter a valid Pakistani phone number (e.g. 03XX-XXXXXXX)');
+      setError('Please enter a valid Pakistani phone number (e.g. +92 3XX XXXXXXX)');
       return;
     }
 
     // Convert display format to international format for storage
-    const internationalPhone = '+92' + phone.replace(/[\s-]/g, '').replace(/^0/, '');
+    const internationalPhone = phone.replace(/[\s]/g, '');
     
     try {
       await register({
@@ -129,7 +139,7 @@ export default function RegisterScreen() {
         <View className="mb-6">
           <Input
             label="Full Name"
-            placeholder="Ahmed Khan"
+            placeholder="e.g. Ahmed Khan"
             value={name}
             onChangeText={setName}
             autoCapitalize="words"
@@ -137,30 +147,20 @@ export default function RegisterScreen() {
 
           <Input
             label="Email Address"
-            placeholder="your@email.com"
+            placeholder="e.g. name@example.com"
             value={email}
             onChangeText={setEmail}
             keyboardType="email-address"
             autoCapitalize="none"
           />
 
-          <View>
-            <Text className="text-textMuted text-xs font-bold uppercase tracking-wider mb-1 ml-1">Mobile Phone Number</Text>
-            <View className="flex-row items-center bg-surface border border-borderDark rounded-xl mb-4">
-              <View className="px-3 py-3 border-r border-borderDark bg-surfaceLight rounded-l-xl">
-                <Text className="text-textLight font-bold">🇵🇰 +92</Text>
-              </View>
-              <View className="flex-1">
-                <Input
-                  placeholder="03XX-XXXXXXX"
-                  value={phone}
-                  onChangeText={handlePhoneChange}
-                  keyboardType="phone-pad"
-                  maxLength={12}
-                />
-              </View>
-            </View>
-          </View>
+          <Input
+            label="Mobile Phone Number"
+            value={phone}
+            onChangeText={handlePhoneChange}
+            keyboardType="phone-pad"
+            maxLength={15}
+          />
 
           <Input
             label="Password"
