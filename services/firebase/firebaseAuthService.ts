@@ -143,6 +143,7 @@ export const firebaseAuthService = {
    * Used to populate doctor lists for booking and patient lists for prescriptions.
    */
   async getUsersByRole(role: 'patient' | 'doctor'): Promise<User[]> {
+    if (!auth.currentUser) return [];
     try {
       const usersRef = ref(database, 'users');
       const q = query(usersRef, orderByChild('role'), equalTo(role));

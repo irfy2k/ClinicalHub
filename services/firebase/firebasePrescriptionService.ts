@@ -1,5 +1,5 @@
-import { ref, push, get, set, query, orderByChild, equalTo } from 'firebase/database';
-import { database } from './firebaseConfig';
+import { ref, push, get, set, query, orderByChild, equalTo, update } from 'firebase/database';
+import { database, cleanObject } from './firebaseConfig';
 import { Prescription, MedicationLog } from '../../types/database';
 
 /**
@@ -55,7 +55,7 @@ export const firebasePrescriptionService = {
         created_at: new Date().toISOString(),
       };
 
-      await set(newRef, newPresc);
+      await set(newRef, cleanObject(newPresc));
 
       return { id: newRef.key!, ...newPresc };
     } catch (error) {
@@ -124,6 +124,15 @@ export const firebasePrescriptionService = {
     } catch (error) {
       console.error('[Firebase Prescriptions] getLogsByPrescription error:', error);
       return [];
+    }
+  },
+  async updatePrescription(id: string, updates: Partial<Prescription>): Promise<void> {
+    try {
+      const prescRef = ref(database, `prescriptions/${id}`);
+      await update(prescRef, cleanObject(updates));
+    } catch (error) {
+      console.error('[Firebase Prescriptions] updatePrescription error:', error);
+      throw error;
     }
   },
 };

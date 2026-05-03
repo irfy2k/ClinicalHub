@@ -299,7 +299,7 @@ export default function MedicationsScreen() {
                 </View>
                 {presc.cost_estimate && (
                   <View className="bg-primary/20 px-2 py-1 rounded border border-primary">
-                    <Text className="text-primary text-xs font-bold uppercase tracking-wider">${presc.cost_estimate.toFixed(2)}</Text>
+                    <Text className="text-primary text-xs font-bold uppercase tracking-wider">Rs. {presc.cost_estimate.toFixed(2)}</Text>
                   </View>
                 )}
               </View>

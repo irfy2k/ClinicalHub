@@ -32,6 +32,9 @@ export interface Appointment {
   symptom_report?: Record<string, any>;
   notes?: string;
   photo_data?: string;
+  unread_count_patient?: number;
+  unread_count_doctor?: number;
+  last_message_at?: string;
   created_at: string;
 }
 

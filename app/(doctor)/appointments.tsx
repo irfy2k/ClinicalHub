@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, RefreshControl, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, RefreshControl, ActivityIndicator, Alert, Modal } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { FontAwesome } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { Services } from '../../services';
@@ -14,11 +15,14 @@ export default function DoctorAppointments() {
   const [filter, setFilter] = useState<'Upcoming' | 'Past'>('Upcoming');
   const [refreshing, setRefreshing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [previewPhoto, setPreviewPhoto] = useState<string | null>(null);
   const router = useRouter();
 
-  useEffect(() => {
-    loadAppointments();
-  }, [user]);
+  useFocusEffect(
+    React.useCallback(() => {
+      loadAppointments();
+    }, [user])
+  );
 
   const loadAppointments = async () => {
     if (!user) return;
@@ -120,13 +124,34 @@ export default function DoctorAppointments() {
 
               {appt.status !== 'completed' && appt.status !== 'cancelled' && (
                 <View className="mt-4 pt-4 border-t border-borderDark flex-row justify-between items-center">
-                   <Text className="text-textMuted text-xs mb-1">Engage Patient</Text>
+                   <View className="flex-1">
+                     <Text className="text-textMuted text-xs mb-1">Clinical Context</Text>
+                     {appt.photo_data ? (
+                       <TouchableOpacity onPress={() => setPreviewPhoto(appt.photo_data!)} className="flex-row items-center">
+                         <FontAwesome name="image" size={14} color="#85B523" />
+                         <Text className="text-primary font-semibold text-sm ml-2">View Symptom Photo</Text>
+                       </TouchableOpacity>
+                     ) : (
+                       <Text className="text-textMuted text-sm italic">No photo attached</Text>
+                     )}
+                   </View>
                    <View className="flex-row gap-2">
                      <TouchableOpacity 
-                       className="w-10 h-10 bg-surfaceLight border border-borderDark rounded-full items-center justify-center"
+                       className="w-12 h-12 bg-surfaceLight border border-borderDark rounded-xl items-center justify-center relative"
                        onPress={() => router.push(`/chat/${appt.id}` as any)}
                      >
-                       <FontAwesome name="commenting" size={16} color="#E2E8F0" />
+                       {(appt.unread_count_doctor || 0) > 0 && (
+                         <View className="absolute -top-1 -right-1 bg-primary w-5 h-5 rounded-full items-center justify-center border-2 border-surface">
+                           <Text className="text-background text-[10px] font-bold">{appt.unread_count_doctor || 0}</Text>
+                         </View>
+                       )}
+                       <FontAwesome name="commenting" size={18} color="#E2E8F0" />
+                     </TouchableOpacity>
+                     <TouchableOpacity 
+                       className="h-12 bg-primary/20 border border-primary rounded-xl px-4 items-center justify-center"
+                       onPress={() => router.push(`/(doctor)/queue`)}
+                     >
+                        <Text className="text-primary font-bold text-sm">Manage</Text>
                      </TouchableOpacity>
                    </View>
                 </View>
@@ -135,6 +160,28 @@ export default function DoctorAppointments() {
           ))
         )}
       </ScrollView>
+
+      {/* Photo Preview Modal */}
+      <Modal visible={!!previewPhoto} transparent animationType="fade">
+        <View className="flex-1 bg-black/90 items-center justify-center p-6">
+           <TouchableOpacity 
+             className="absolute top-12 right-6 z-10 w-10 h-10 bg-white/10 rounded-full items-center justify-center"
+             onPress={() => setPreviewPhoto(null)}
+           >
+             <FontAwesome name="close" size={20} color="white" />
+           </TouchableOpacity>
+           <View className="w-full h-[70%] bg-surface rounded-3xl overflow-hidden">
+             {previewPhoto && (
+               <View style={{ width: '100%', height: '100%' }}>
+                  <View className="flex-1 items-center justify-center bg-zinc-900">
+                     <FontAwesome name="image" size={80} color="#2F333A" />
+                     <Text className="text-textMuted mt-4">Symptom Photo from Patient</Text>
+                  </View>
+               </View>
+             )}
+           </View>
+        </View>
+      </Modal>
     </View>
   );
 }

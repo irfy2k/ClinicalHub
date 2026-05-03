@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import clsx from 'clsx';
 import { View, Text, ScrollView, TouchableOpacity, Modal, Alert, RefreshControl, ActivityIndicator } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
@@ -9,7 +9,6 @@ import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { notificationService } from '../../services/notificationService';
-import { firebaseAuthService } from '../../services/firebase/firebaseAuthService';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 
 const TIME_SLOTS = [
@@ -22,23 +21,40 @@ export default function DoctorPrescriptions() {
   const params = useLocalSearchParams();
   const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
   const [filter, setFilter] = useState<'Active' | 'All'>('Active');
-  const [isCreating, setIsCreating] = useState(false);
-  const [patientUsers, setPatientUsers] = useState<User[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  // New prescription form state
+  const [isCreating, setIsCreating] = useState(false);
+  const [patientUsers, setPatientUsers] = useState<User[]>([]);
   const [medName, setMedName] = useState('');
   const [dosage, setDosage] = useState('');
   const [costEstimate, setCostEstimate] = useState('');
-  const [startDate, setStartDate] = useState('');
+  const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
   const [endDate, setEndDate] = useState('');
   const [selectedTimes, setSelectedTimes] = useState<string[]>([]);
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
+  const [showDatePicker, setShowDatePicker] = useState<{ field: 'start' | 'end'; visible: boolean }>({ field: 'start', visible: false });
+
+  const loadData = useCallback(async () => {
+    if (!user) return;
+    try {
+      setIsLoading(true);
+      const [prescData, patientData] = await Promise.all([
+        Services.prescription.getByDoctor(user.id),
+        Services.auth.getUsersByRole('patient')
+      ]);
+      setPrescriptions(prescData);
+      setPatientUsers(patientData);
+    } catch (error) {
+      console.error("Load error:", error);
+    } finally {
+      setIsLoading(false);
+      setRefreshing(false);
+    }
+  }, [user]);
 
   useEffect(() => {
-    loadPrescriptions();
-    loadPatients();
+    loadData();
   }, [user]);
 
   useEffect(() => {
@@ -48,35 +64,9 @@ export default function DoctorPrescriptions() {
     }
   }, [params?.patientId]);
 
-  const loadPrescriptions = async () => {
-    if (!user) return;
-    try {
-      const data = await Services.prescription.getByDoctor(user.id);
-      setPrescriptions(data);
-    } catch (error) {
-      Alert.alert('Error', 'Failed to load prescriptions.');
-    } finally {
-      setIsLoading(false);
-      setRefreshing(false);
-    }
-  };
-
   const onRefresh = () => {
     setRefreshing(true);
-    loadPrescriptions();
-  };
-
-  const loadPatients = async () => {
-    if (!user) return;
-    const [patients, appts] = await Promise.all([
-      firebaseAuthService.getUsersByRole('patient'),
-      Services.appointment.getByDoctor(user.id)
-    ]);
-
-    // Only show patients that have booked an appointment with this doctor
-    const treatedPatientIds = new Set(appts.map(a => a.patient_id));
-    const treatedPatients = patients.filter(p => treatedPatientIds.has(p.id));
-    setPatientUsers(treatedPatients);
+    loadData();
   };
 
   const toggleTime = (time: string) => {
@@ -91,7 +81,7 @@ export default function DoctorPrescriptions() {
     setMedName('');
     setDosage('');
     setCostEstimate('');
-    setStartDate('');
+    setStartDate(new Date().toISOString().split('T')[0]);
     setEndDate('');
     setSelectedTimes([]);
     setSelectedPatientId(null);
@@ -113,13 +103,12 @@ export default function DoctorPrescriptions() {
       medication_name: medName,
       dosage,
       schedule_times: selectedTimes,
-      start_date: startDate || new Date().toISOString().split('T')[0],
+      start_date: startDate,
       end_date: endDate || undefined,
       cost_estimate: costEstimate ? parseFloat(costEstimate) : undefined,
       is_active: true,
     });
 
-    // Automatically generate a health expense for the patient if a cost was entered
     if (costEstimate && parseFloat(costEstimate) > 0) {
       await Services.finance.create({
         patient_id: selectedPatientId,
@@ -130,10 +119,7 @@ export default function DoctorPrescriptions() {
       });
     }
 
-    // Schedule medication reminders for the new prescription
     await notificationService.scheduleMedicationReminders(newPrescription);
-
-    // Send confirmation notification
     await notificationService.sendInstantNotification(
       '💊 New Prescription Issued',
       `${medName} (${dosage}) has been prescribed to ${patientName}. Reminders have been scheduled.`
@@ -141,7 +127,7 @@ export default function DoctorPrescriptions() {
 
     resetForm();
     setIsCreating(false);
-    loadPrescriptions();
+    loadData();
     Alert.alert('Success', 'Prescription created and reminders scheduled.');
   };
 
@@ -156,7 +142,7 @@ export default function DoctorPrescriptions() {
           style: currentStatus ? 'destructive' : 'default',
           onPress: async () => {
             await Services.prescription.updateStatus(id, !currentStatus);
-            loadPrescriptions();
+            loadData();
           }
         }
       ]
@@ -265,7 +251,6 @@ export default function DoctorPrescriptions() {
         )}
       </ScrollView>
 
-      {/* Floating Action Button */}
       <View className="absolute bottom-6 right-6">
         <TouchableOpacity
           className="w-14 h-14 bg-primary rounded-full items-center justify-center shadow-lg"
@@ -275,7 +260,6 @@ export default function DoctorPrescriptions() {
         </TouchableOpacity>
       </View>
 
-      {/* New Prescription Modal */}
       <Modal visible={isCreating} animationType="slide" presentationStyle="pageSheet">
         <ScrollView className="flex-1 bg-background pt-12 px-6" contentContainerStyle={{ paddingBottom: 40 }}>
           <View className="flex-row justify-between items-center mb-6">
@@ -285,7 +269,6 @@ export default function DoctorPrescriptions() {
             </TouchableOpacity>
           </View>
 
-          {/* Patient Selection */}
           <Text className="text-textMuted text-xs uppercase tracking-wider font-bold mb-3">Select Patient</Text>
           {patientUsers.length === 0 ? (
             <Text className="text-textMuted text-sm mb-6">No patients registered yet.</Text>
@@ -318,60 +301,37 @@ export default function DoctorPrescriptions() {
             </View>
           )}
 
-          {/* Medication Details */}
-          <Input
-            label="Medication Name"
-            placeholder="e.g. Amoxicillin"
-            value={medName}
-            onChangeText={setMedName}
-          />
-          <Input
-            label="Dosage"
-            placeholder="e.g. 500mg, 2 tablets"
-            value={dosage}
-            onChangeText={setDosage}
-          />
-          <Input
-            label="Cost Estimate (Rs.)"
-            placeholder="e.g. 15.50"
-            value={costEstimate}
-            onChangeText={setCostEstimate}
-            keyboardType="decimal-pad"
-          />
+          <Input label="Medication Name" placeholder="e.g. Amoxicillin" value={medName} onChangeText={setMedName} />
+          <Input label="Dosage" placeholder="e.g. 500mg, 2 tablets" value={dosage} onChangeText={setDosage} />
+          <Input label="Cost Estimate (Rs.)" placeholder="e.g. 1500" value={costEstimate} onChangeText={setCostEstimate} keyboardType="decimal-pad" />
 
-          {/* Date Range */}
-          <View className="flex-row gap-4">
-            <View className="flex-1">
-              <Input
-                label="Start Date"
-                placeholder="YYYY-MM-DD"
-                value={startDate}
-                onChangeText={setStartDate}
-              />
-            </View>
-            <View className="flex-1">
-              <Input
-                label="End Date (Optional)"
-                placeholder="YYYY-MM-DD"
-                value={endDate}
-                onChangeText={setEndDate}
-              />
-            </View>
+          <Text className="text-textMuted text-xs uppercase tracking-wider font-bold mb-3 mt-2">Treatment Duration</Text>
+          <View className="flex-row gap-4 mb-6">
+            <TouchableOpacity 
+              className="flex-1 bg-surfaceLight border border-borderDark rounded-xl p-4"
+              onPress={() => setShowDatePicker({ field: 'start', visible: true })}
+            >
+              <Text className="text-textMuted text-[10px] uppercase font-bold mb-1">Start Date</Text>
+              <Text className="text-textLight font-bold">{startDate}</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              className="flex-1 bg-surfaceLight border border-borderDark rounded-xl p-4"
+              onPress={() => setShowDatePicker({ field: 'end', visible: true })}
+            >
+              <Text className="text-textMuted text-[10px] uppercase font-bold mb-1">End Date (Optional)</Text>
+              <Text className="text-textLight font-bold">{endDate || 'Ongoing'}</Text>
+            </TouchableOpacity>
           </View>
 
-          {/* Schedule Times */}
           <Text className="text-textMuted text-xs uppercase tracking-wider font-bold mb-3">Schedule Times</Text>
-          <Text className="text-textMuted text-xs mb-4">Select when the patient should take this medication.</Text>
           <View className="flex-row flex-wrap gap-2 mb-8">
             {TIME_SLOTS.map(slot => {
               const isActive = selectedTimes.includes(slot);
               return (
                 <TouchableOpacity
                   key={slot}
-                  className={clsx(
-                    "px-3 py-2 border rounded-lg",
-                    isActive ? "bg-primary/20 border-primary" : "bg-surfaceLight border-borderDark"
-                  )}
+                  className={clsx("px-3 py-2 border rounded-lg", isActive ? "bg-primary/20 border-primary" : "bg-surfaceLight border-borderDark")}
                   onPress={() => toggleTime(slot)}
                 >
                   <Text className={clsx("font-bold text-sm", isActive ? "text-primary" : "text-textMuted")}>{slot}</Text>
@@ -380,13 +340,46 @@ export default function DoctorPrescriptions() {
             })}
           </View>
 
-          <Button
-            label="Issue Prescription"
-            fullWidth
-            onPress={handleCreate}
-            disabled={!selectedPatientId || !medName || !dosage || selectedTimes.length === 0}
-          />
+          <Button label="Create Prescription" fullWidth onPress={handleCreate} className="mt-4" disabled={!medName || !dosage || !selectedPatientId || selectedTimes.length === 0} />
         </ScrollView>
+      </Modal>
+
+      <Modal visible={showDatePicker.visible} transparent animationType="fade">
+        <View className="flex-1 bg-black/60 items-center justify-center p-6">
+          <Card className="w-full max-w-sm">
+            <Text className="text-xl font-bold text-textLight mb-4">Select {showDatePicker.field === 'start' ? 'Start' : 'End'} Date</Text>
+            <ScrollView className="max-h-64">
+               {Array.from({ length: 30 }).map((_, i) => {
+                 const date = new Date();
+                 date.setDate(date.getDate() + i);
+                 const dateStr = date.toISOString().split('T')[0];
+                 return (
+                   <TouchableOpacity 
+                     key={dateStr}
+                     className="py-3 border-b border-borderDark flex-row justify-between items-center"
+                     onPress={() => {
+                       if (showDatePicker.field === 'start') setStartDate(dateStr);
+                       else setEndDate(dateStr);
+                       setShowDatePicker({ ...showDatePicker, visible: false });
+                     }}
+                   >
+                     <Text className="text-textLight">{date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}</Text>
+                     <FontAwesome name="chevron-right" size={12} color="#2F333A" />
+                   </TouchableOpacity>
+                 );
+               })}
+               {showDatePicker.field === 'end' && (
+                 <TouchableOpacity 
+                    className="py-3 items-center"
+                    onPress={() => { setEndDate(''); setShowDatePicker({ ...showDatePicker, visible: false }); }}
+                 >
+                    <Text className="text-primary font-bold">Set as Ongoing (No End Date)</Text>
+                 </TouchableOpacity>
+               )}
+            </ScrollView>
+            <Button label="Cancel" variant="secondary" fullWidth className="mt-4" onPress={() => setShowDatePicker({ ...showDatePicker, visible: false })} />
+          </Card>
+        </View>
       </Modal>
     </View>
   );

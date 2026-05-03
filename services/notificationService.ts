@@ -30,6 +30,7 @@ class NotificationService {
    * Returns the Expo push token if on a physical device.
    */
   async requestPermissions(): Promise<string | null> {
+    if (Platform.OS === 'web') return null;
     if (!Device.isDevice) {
       console.warn('Push notifications require a physical device.');
       return null;
@@ -89,6 +90,7 @@ class NotificationService {
     for (const time of prescription.schedule_times) {
       const [hours, minutes] = time.split(':').map(Number);
 
+      if (Platform.OS === 'web') return [];
       const notificationId = await Notifications.scheduleNotificationAsync({
         content: {
           title: '💊 Medication Reminder',
@@ -141,6 +143,7 @@ class NotificationService {
       r => r.prescriptionId === prescriptionId
     );
 
+    if (Platform.OS === 'web') return;
     for (const reminder of toCancel) {
       await Notifications.cancelScheduledNotificationAsync(reminder.notificationId);
     }
@@ -169,6 +172,7 @@ class NotificationService {
 
     const secondsUntilReminder = Math.floor((reminderTime - now) / 1000);
 
+    if (Platform.OS === 'web') return null;
     const notificationId = await Notifications.scheduleNotificationAsync({
       content: {
         title: '📅 Upcoming Appointment',
@@ -194,6 +198,7 @@ class NotificationService {
    * Send an immediate local notification (used for status updates, confirmations, etc.)
    */
   async sendInstantNotification(title: string, body: string, data?: Record<string, any>): Promise<void> {
+    if (Platform.OS === 'web') return;
     await Notifications.scheduleNotificationAsync({
       content: {
         title,
@@ -209,7 +214,9 @@ class NotificationService {
    * Cancel all scheduled notifications.
    */
   async cancelAllNotifications(): Promise<void> {
-    await Notifications.cancelAllScheduledNotificationsAsync();
+    if (Platform.OS !== 'web') {
+      await Notifications.cancelAllScheduledNotificationsAsync();
+    }
     this.scheduledReminders = [];
   }
 

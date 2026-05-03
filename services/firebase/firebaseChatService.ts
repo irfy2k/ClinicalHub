@@ -1,6 +1,7 @@
-import { ref, push, get, set, query, orderByChild, equalTo, onValue, off, DatabaseReference } from 'firebase/database';
+import { ref, push, get, set, query, orderByChild, equalTo, onValue, off, DatabaseReference, increment, update } from 'firebase/database';
 import { database } from './firebaseConfig';
 import { ChatMessage } from '../../types/database';
+import { notificationService } from '../notificationService';
 
 /**
  * Firebase Chat Service
@@ -68,12 +69,47 @@ export const firebaseChatService = {
       const chatsRef = ref(database, 'chat_messages');
       const newRef = push(chatsRef);
 
+      const now = new Date().toISOString();
       const newMsg: Omit<ChatMessage, 'id'> = {
         ...message,
-        created_at: new Date().toISOString(),
+        created_at: now,
       };
 
       await set(newRef, newMsg);
+
+      // Update appointment metadata for unread tracking
+      const apptRef = ref(database, `appointments/${message.appointment_id}`);
+      const apptSnapshot = await get(apptRef);
+      
+      if (apptSnapshot.exists()) {
+        const apptData = apptSnapshot.val();
+        const isSenderPatient = apptData.patient_id === message.sender_id;
+        
+        const updates: any = {
+          last_message_at: now,
+        };
+
+        if (isSenderPatient) {
+          updates.unread_count_doctor = increment(1);
+        } else {
+          updates.unread_count_patient = increment(1);
+        }
+
+        await update(apptRef, updates);
+
+        // Send push notification to the other participant
+        const recipientId = isSenderPatient ? apptData.doctor_id : apptData.patient_id;
+        const senderName = isSenderPatient ? apptData.patient_name : apptData.doctor_name;
+        
+        try {
+          await notificationService.sendInstantNotification(
+            `New Message from ${senderName || 'Secure Chat'}`,
+            message.content.length > 50 ? `${message.content.substring(0, 47)}...` : message.content
+          );
+        } catch (notifError) {
+          console.warn('[Firebase Chat] Notification failed to send:', notifError);
+        }
+      }
 
       return { id: newRef.key!, ...newMsg };
     } catch (error) {

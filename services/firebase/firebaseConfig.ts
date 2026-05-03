@@ -39,4 +39,22 @@ const database = getDatabase(app);
 // Initialize Storage
 // const storage = getStorage(app); // Skipping Storage
 
-export { app, auth, database /*, storage */ };
+/**
+ * Recursively removes undefined values from an object to ensure Firebase compatibility.
+ * Firebase set() and update() fail if any property is undefined.
+ */
+function cleanObject(obj: any): any {
+  if (Array.isArray(obj)) {
+    return obj.map(v => cleanObject(v));
+  }
+  if (obj !== null && typeof obj === 'object') {
+    return Object.fromEntries(
+      Object.entries(obj)
+        .filter(([_, v]) => v !== undefined)
+        .map(([k, v]) => [k, cleanObject(v)])
+    );
+  }
+  return obj;
+}
+
+export { app, auth, database, cleanObject /*, storage */ };

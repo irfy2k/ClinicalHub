@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Modal, Image, Alert, RefreshControl, ActivityIndicator } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { FontAwesome } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { Services } from '../../services';
@@ -19,9 +20,11 @@ export default function QueueScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    loadAppointments();
-  }, [user]);
+  useFocusEffect(
+    React.useCallback(() => {
+      loadAppointments();
+    }, [user])
+  );
 
   const loadAppointments = async () => {
     if (!user) return;
@@ -148,8 +151,13 @@ export default function QueueScreen() {
             <TouchableOpacity key={appt.id} onPress={() => setSelectedAppt(appt)}>
               <Card className="mb-4 flex-row items-center justify-between">
                 <View className="flex-row items-center">
-                  <View className="w-12 h-12 bg-surfaceLight rounded-full items-center justify-center border border-borderDark mr-4">
+                  <View className="w-12 h-12 bg-surfaceLight rounded-full items-center justify-center border border-borderDark mr-4 relative">
                     <FontAwesome name="user-circle" size={24} color="#94A3B8" />
+                    {(appt.unread_count_doctor || 0) > 0 && (
+                      <View className="absolute -top-1 -right-1 w-5 h-5 bg-primary rounded-full items-center justify-center border-2 border-surface">
+                        <Text className="text-background text-[10px] font-bold">{appt.unread_count_doctor || 0}</Text>
+                      </View>
+                    )}
                   </View>
                   <View className="flex-1 pr-4">
                     <Text className="text-textLight font-bold text-lg">{getPatientName(appt.patient_id)}</Text>
@@ -223,46 +231,53 @@ export default function QueueScreen() {
             )}
             
             {(selectedAppt?.status === 'pending' || selectedAppt?.status === 'confirmed') && (
-              <View className="flex-row mb-3">
-                <Button 
-                  label="Complete Appointment" 
-                  className="flex-1"
-                  onPress={() => handleStatusChange('completed')} 
-                />
-                <Button 
-                  label="Start Call" 
-                  className="flex-1 ml-2" 
+              <View className="flex-row mb-3 gap-2">
+                <TouchableOpacity 
+                  className="flex-1 bg-primary py-4 rounded-xl items-center justify-center"
+                  onPress={() => handleStatusChange('completed')}
+                >
+                  <Text className="text-background font-bold">Complete Visit</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  className="flex-1 bg-surfaceLight border border-primary py-4 rounded-xl items-center justify-center"
                   onPress={() => {
                     setSelectedAppt(null);
                     router.push('/(doctor)/telemedicine');
-                  }} 
-                />
+                  }}
+                >
+                  <Text className="text-primary font-bold">Start Call</Text>
+                </TouchableOpacity>
               </View>
             )}
 
-            <View className="flex-row mb-4">
-              <Button 
-                label="Message Patient" 
-                variant="secondary"
-                className="flex-1 mr-2 px-1" 
+            <View className="flex-row mb-4 gap-2">
+              <TouchableOpacity 
+                className="flex-1 bg-surfaceLight border border-borderDark py-4 rounded-xl items-center justify-center relative"
                 onPress={() => {
                   if (!selectedAppt) return;
                   const apptId = selectedAppt.id;
                   setSelectedAppt(null);
                   router.push(`/chat/${apptId}` as any);
-                }} 
-              />
-              <Button 
-                label="Prescribe Medicine" 
-                variant="secondary"
-                className="flex-1 ml-2 px-1 text-center" 
+                }}
+              >
+                {(selectedAppt?.unread_count_doctor || 0) > 0 && (
+                  <View className="absolute -top-2 -right-2 bg-primary px-2 py-0.5 rounded-full border-2 border-background z-20">
+                    <Text className="text-background text-[10px] font-bold">{selectedAppt?.unread_count_doctor || 0}</Text>
+                  </View>
+                )}
+                <Text className="text-textLight font-bold">Message</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                className="flex-1 bg-surfaceLight border border-borderDark py-4 rounded-xl items-center justify-center"
                 onPress={() => {
                   if (!selectedAppt) return;
                   const patientId = selectedAppt.patient_id;
                   setSelectedAppt(null);
                   router.push({ pathname: '/(doctor)/prescriptions', params: { patientId } } as any);
-                }} 
-              />
+                }}
+              >
+                <Text className="text-textLight font-bold">Prescribe</Text>
+              </TouchableOpacity>
             </View>
 
             <Text className="text-textMuted text-xs font-bold uppercase tracking-wider mb-3">Update Status</Text>
