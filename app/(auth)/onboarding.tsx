@@ -8,7 +8,7 @@ import * as z from 'zod';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { FontAwesome } from '@expo/vector-icons';
-import clsx from 'clsx';
+import { clsx } from 'clsx';
 
 const schema = z.object({
   height: z.string().optional(),
@@ -29,7 +29,7 @@ export default function OnboardingScreen() {
   const { updateUser } = useAuth();
   const [selectedConditions, setSelectedConditions] = useState<string[]>([]);
   
-  const { control, handleSubmit, watch, formState: { errors } } = useForm<FormData>({
+  const { control, handleSubmit, watch } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: { height: '', weight: '', bloodType: '', allergies: '' }
   });

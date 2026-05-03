@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { FontAwesome } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '../../context/AuthContext';
@@ -43,7 +42,7 @@ export default function ChatScreen() {
     if (id && user) {
       Services.appointment.markAsRead(id, user.role as any);
     }
-  }, [id, user, messages]);
+  }, [id, user]);
 
   const handleSend = async () => {
     if (!inputText.trim() || !user || !id) return;

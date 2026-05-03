@@ -1,5 +1,5 @@
 import { View, ViewProps } from 'react-native';
-import clsx from 'clsx';
+import { clsx } from 'clsx';
 
 export function Card({ children, className, ...props }: ViewProps) {
   return (

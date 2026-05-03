@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Modal, Alert } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
@@ -10,11 +10,12 @@ import { Card } from '../../components/ui/Card';
 import { IntakeWizard } from '../../components/symptoms/IntakeWizard';
 import { notificationService } from '../../services/notificationService';
 import { firebaseAuthService } from '../../services/firebase/firebaseAuthService';
-import clsx from 'clsx';
-import { useRouter } from 'expo-router';
+import { SlotAlreadyBookedError } from '../../services/firebase/firebaseAppointmentService';
+import { clsx } from 'clsx';
 import * as ImagePicker from 'expo-image-picker';
 
 export default function PatientAppointments() {
+  const PKT_OFFSET_MINUTES = 5 * 60;
   const { user } = useAuth();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [filter, setFilter] = useState<'Upcoming' | 'Past'>('Upcoming');
@@ -25,31 +26,133 @@ export default function PatientAppointments() {
   const [wizardDoctorName, setWizardDoctorName] = useState<string>('');
   const [doctors, setDoctors] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const getPakistanNow = () => {
+    const now = new Date();
+    const utcMs = now.getTime() + now.getTimezoneOffset() * 60 * 1000;
+    return new Date(utcMs + PKT_OFFSET_MINUTES * 60 * 1000);
+  };
+
+  const toPakistanDateKey = (date: Date) => {
+    const y = date.getUTCFullYear();
+    const m = (date.getUTCMonth() + 1).toString().padStart(2, '0');
+    const d = date.getUTCDate().toString().padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  };
+
+  const [selectedDate, setSelectedDate] = useState(toPakistanDateKey(getPakistanNow()));
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [previewPhoto, setPreviewPhoto] = useState<string | null>(null);
-  const router = useRouter();
+  const [bookedSlotsByDoctor, setBookedSlotsByDoctor] = useState<Record<string, Set<string>>>({});
 
-  useEffect(() => {
-    loadAppointments();
-    loadDoctors();
-  }, [user]);
+  const buildScheduledAtIso = (dateStr: string, timeStr: string) => {
+    const [year, month, day] = dateStr.split('-').map(Number);
+    const [hours, minutes] = timeStr.split(':').map(Number);
+    const utcMs = Date.UTC(year, month - 1, day, hours, minutes, 0, 0) - PKT_OFFSET_MINUTES * 60 * 1000;
+    return new Date(utcMs).toISOString();
+  };
 
-  const loadAppointments = async () => {
+  const normalizeSlot = (slot: string) => {
+    const [hRaw = '0', mRaw = '0'] = slot.split(':');
+    const h = Number(hRaw);
+    const m = Number(mRaw);
+    if (Number.isNaN(h) || Number.isNaN(m)) return slot;
+    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+  };
+
+  const markSlotBookedLocally = (doctorId: string, slot: string) => {
+    const normalized = normalizeSlot(slot);
+    setBookedSlotsByDoctor((prev) => {
+      const next = { ...prev };
+      const existing = prev[doctorId] ? new Set(prev[doctorId]) : new Set<string>();
+      existing.add(normalized);
+      next[doctorId] = existing;
+      return next;
+    });
+  };
+
+  const getDateLabel = (dateStr: string) => {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const pktDate = new Date(Date.UTC(y, m - 1, d, 0, 0, 0));
+    const today = toPakistanDateKey(getPakistanNow());
+    const tomorrowDate = new Date(getPakistanNow().getTime() + 24 * 60 * 60 * 1000);
+    const tomorrow = toPakistanDateKey(tomorrowDate);
+    const base = pktDate.toLocaleDateString('en-PK', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      timeZone: 'UTC',
+    });
+    if (dateStr === today) return `Today • ${base}`;
+    if (dateStr === tomorrow) return `Tomorrow • ${base}`;
+    return base;
+  };
+
+  const dateOptions = Array.from({ length: 21 }).map((_, i) => {
+    const pkt = getPakistanNow();
+    pkt.setUTCDate(pkt.getUTCDate() + i);
+    return toPakistanDateKey(pkt);
+  });
+
+  const loadAppointments = useCallback(async () => {
     if (!user) return;
     try {
       const data = await Services.appointment.getByPatient(user.id);
       setAppointments(data);
-    } catch (e) {
+    } catch {
       Alert.alert('Error', 'Failed to load appointments. Please try again.');
     }
-  };
+  }, [user]);
+
+  useEffect(() => {
+    loadAppointments();
+    loadDoctors();
+  }, [loadAppointments, user]);
+
+  const loadBookedSlots = useCallback(async () => {
+    if (!doctors.length) {
+      setBookedSlotsByDoctor({});
+      return;
+    }
+
+    const toPakistanSlotTime = (isoDate: string) => {
+      const dt = new Date(new Date(isoDate).getTime() + PKT_OFFSET_MINUTES * 60 * 1000);
+      const hh = dt.getUTCHours().toString().padStart(2, '0');
+      const mm = dt.getUTCMinutes().toString().padStart(2, '0');
+      return normalizeSlot(`${hh}:${mm}`);
+    };
+
+    const toPakistanDateFromIso = (isoDate: string) => {
+      const dt = new Date(new Date(isoDate).getTime() + PKT_OFFSET_MINUTES * 60 * 1000);
+      return toPakistanDateKey(dt);
+    };
+
+    const slotMap: Record<string, Set<string>> = {};
+    await Promise.all(
+      doctors.map(async (doc) => {
+        const docAppointments = await Services.appointment.getByDoctor(doc.id);
+        const occupied = docAppointments
+          .filter(
+            (appt) =>
+              (appt.status === 'pending' || appt.status === 'confirmed') &&
+              toPakistanDateFromIso(appt.scheduled_at) === selectedDate
+          )
+          .map((appt) => toPakistanSlotTime(appt.scheduled_at));
+
+        slotMap[doc.id] = new Set(occupied);
+      })
+    );
+    setBookedSlotsByDoctor(slotMap);
+  }, [doctors, selectedDate, PKT_OFFSET_MINUTES]);
+
+  useEffect(() => {
+    loadBookedSlots();
+  }, [loadBookedSlots]);
 
   const loadDoctors = async () => {
     try {
       const docs = await firebaseAuthService.getUsersByRole('doctor');
       setDoctors(docs);
-    } catch (e) {
+    } catch {
       // Handle error silently here
     } finally {
       setIsLoading(false);
@@ -65,29 +168,10 @@ export default function PatientAppointments() {
   const handleIntakeComplete = async (intakeData: any) => {
     if (!user || !wizardTargetDoctor || !wizardTargetTime) return;
 
-    // Use the selectedDate state instead of new Date()
-    const baseDate = new Date(selectedDate);
-    if (wizardTargetTime) {
-      const [hours, minutes] = wizardTargetTime.split(':').map(Number);
-      baseDate.setHours(hours, minutes, 0, 0);
-    }
-    const scheduledAt = baseDate.toISOString();
+    const scheduledAt = buildScheduledAtIso(selectedDate, wizardTargetTime);
 
-    // BUG-11 FIX: Check for slot conflicts
     try {
-      const doctorAppts = await Services.appointment.getByDoctor(wizardTargetDoctor);
-      const hasConflict = doctorAppts.some(appt => 
-        (appt.status === 'pending' || appt.status === 'confirmed') && 
-        appt.scheduled_at === scheduledAt
-      );
-
-      if (hasConflict) {
-        Alert.alert('Slot Unavailable', 'This time slot was just booked by someone else. Please choose another slot.');
-        setWizardTargetDoctor(null);
-        return;
-      }
-      
-      await Services.appointment.create({
+      await Services.appointment.createWithSlotLock({
         patient_id: user.id,
         doctor_id: wizardTargetDoctor,
         patient_name: user.name,
@@ -97,6 +181,8 @@ export default function PatientAppointments() {
         notes: `Symptoms: ${intakeData.symptoms} | Pain: ${intakeData.painLevel}/10 | Duration: ${intakeData.duration} | Slot: ${wizardTargetTime}`,
         photo_data: intakeData.photoData || undefined
       });
+      // Update UI immediately so slot greys out without waiting for refetch.
+      markSlotBookedLocally(wizardTargetDoctor, wizardTargetTime);
 
       // Schedule a push notification reminder 30 minutes before the appointment
       await notificationService.scheduleAppointmentReminder(
@@ -116,7 +202,13 @@ export default function PatientAppointments() {
       setWizardDoctorName('');
       setIsBooking(false);
       loadAppointments();
+      loadBookedSlots();
     } catch (e) {
+      if (e instanceof SlotAlreadyBookedError) {
+        Alert.alert('Slot Unavailable', 'This slot was booked by someone else. Please select another time.');
+        setWizardTargetDoctor(null);
+        return;
+      }
       Alert.alert('Booking Error', 'Could not create appointment. Please try again.');
     }
   };
@@ -134,7 +226,7 @@ export default function PatientAppointments() {
             try {
               await Services.appointment.updateStatus(apptId, 'cancelled');
               loadAppointments();
-            } catch (e) {
+            } catch {
               Alert.alert('Error', 'Failed to cancel appointment.');
             }
           }
@@ -158,7 +250,7 @@ export default function PatientAppointments() {
         await Services.appointment.updateAppointment(id, { photo_data: photoData });
         loadAppointments();
         Alert.alert('Success', 'Photo attached to your appointment record.');
-      } catch (e) {
+      } catch {
         Alert.alert('Error', 'Failed to upload photo.');
       }
     }
@@ -307,8 +399,8 @@ export default function PatientAppointments() {
 
           <View className="flex-row justify-between items-center mt-4 mb-2">
             <Text className="text-textLight font-bold">Select Date</Text>
-            <TouchableOpacity onPress={() => setShowDatePicker(true)} className="flex-row items-center bg-surfaceLight px-3 py-1.5 rounded-lg border border-borderDark">
-              <Text className="text-primary font-bold mr-2">{selectedDate}</Text>
+            <TouchableOpacity onPress={() => setShowDatePicker(true)} className="flex-row items-center bg-surfaceLight px-3 py-1.5 rounded-lg border border-borderDark max-w-[78%]">
+              <Text className="text-primary font-bold mr-2" numberOfLines={1}>{getDateLabel(selectedDate)}</Text>
               <FontAwesome name="calendar" size={14} color="#85B523" />
             </TouchableOpacity>
           </View>
@@ -319,7 +411,7 @@ export default function PatientAppointments() {
             {filteredDoctors.length === 0 ? (
               <View className="items-center py-10">
                 <FontAwesome name="user-md" size={48} color="#2F333A" />
-                <Text className="text-textMuted mt-4">No doctors found matching "{searchQuery}"</Text>
+                <Text className="text-textMuted mt-4">No doctors found matching &quot;{searchQuery}&quot;</Text>
               </View>
             ) : (
               filteredDoctors.map(doc => (
@@ -337,16 +429,33 @@ export default function PatientAppointments() {
                   </View>
                   <View className="border-t border-borderDark pt-4">
                     <Text className="text-textMuted text-xs font-bold uppercase tracking-wider mb-3">Available Slots (30m blocks)</Text>
+                    {__DEV__ && (
+                      <Text className="text-textMuted text-[10px] mb-2">
+                        Booked: {Array.from(bookedSlotsByDoctor[doc.id] || []).sort().join(', ') || 'None'}
+                      </Text>
+                    )}
                     <View className="flex-row flex-wrap gap-2">
-                       {(doc.available_times || ['09:00', '10:00', '14:00', '15:00']).map(slot => (
+                       {(doc.available_times || ['09:00', '10:00', '14:00', '15:00']).map(slot => {
+                          const normalizedSlot = normalizeSlot(slot);
+                          const isBooked = bookedSlotsByDoctor[doc.id]?.has(normalizedSlot) ?? false;
+                          return (
                           <TouchableOpacity 
                             key={slot} 
-                            className="bg-primary/20 border border-primary rounded px-3 py-2"
+                            className={clsx(
+                              "rounded px-3 py-2 border",
+                              isBooked
+                                ? "bg-surface border-borderDark"
+                                : "bg-primary/20 border-primary"
+                            )}
                             onPress={() => handleBook(doc.id, doc.name, slot)}
+                            disabled={isBooked}
                           >
-                             <Text className="text-primary font-bold">{slot}</Text>
+                             <Text className={clsx("font-bold", isBooked ? "text-textMuted" : "text-primary")}>
+                               {slot}
+                             </Text>
                           </TouchableOpacity>
-                       ))}
+                        );
+                       })}
                        <Text className="text-textMuted text-xs ml-2 self-center">Tap to Book</Text>
                     </View>
                   </View>
@@ -363,21 +472,23 @@ export default function PatientAppointments() {
           <Card className="w-full max-w-sm">
             <Text className="text-xl font-bold text-textLight mb-4">Select Appointment Date</Text>
             <ScrollView className="max-h-64">
-               {Array.from({ length: 14 }).map((_, i) => {
-                 const date = new Date();
-                 date.setDate(date.getDate() + i);
-                 const dateStr = date.toISOString().split('T')[0];
+               {dateOptions.map((dateStr) => {
                  return (
                    <TouchableOpacity 
                      key={dateStr}
-                     className="py-3 border-b border-borderDark flex-row justify-between items-center"
+                     className={clsx(
+                       "py-3 border-b border-borderDark flex-row justify-between items-center",
+                       selectedDate === dateStr && "bg-primary/10"
+                     )}
                      onPress={() => {
                        setSelectedDate(dateStr);
                        setShowDatePicker(false);
                      }}
                    >
-                     <Text className="text-textLight">{date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}</Text>
-                     <FontAwesome name="chevron-right" size={12} color="#2F333A" />
+                     <Text className={clsx("text-textLight", selectedDate === dateStr && "text-primary font-bold")}>
+                       {getDateLabel(dateStr)}
+                     </Text>
+                     <FontAwesome name={selectedDate === dateStr ? "check" : "chevron-right"} size={12} color={selectedDate === dateStr ? "#85B523" : "#2F333A"} />
                    </TouchableOpacity>
                  );
                })}

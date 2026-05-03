@@ -6,7 +6,7 @@ import { Services } from '../../services';
 import { Prescription, MedicationLog } from '../../types/database';
 import { Card } from '../../components/ui/Card';
 import { notificationService } from '../../services/notificationService';
-import clsx from 'clsx';
+import { clsx } from 'clsx';
 
 interface TimelineEntry {
   prescriptionId: string;
@@ -72,7 +72,7 @@ export default function MedicationsScreen() {
       if (remindersEnabled) {
         await notificationService.scheduleAllMedicationReminders(prescData);
       }
-    } catch (e) {
+    } catch {
       Alert.alert('Error', 'Failed to load medications. Please try again.');
     } finally {
       setIsLoading(false);
@@ -194,7 +194,7 @@ export default function MedicationsScreen() {
           />
         </Card>
 
-        <Text className="text-textLight font-bold mt-4 mb-2">Today's Schedule</Text>
+        <Text className="text-textLight font-bold mt-4 mb-2">Today&apos;s Schedule</Text>
       </View>
 
       <ScrollView 

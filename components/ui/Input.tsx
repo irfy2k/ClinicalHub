@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { TextInput, TextInputProps, View, Text, TouchableOpacity } from 'react-native';
-import clsx from 'clsx';
+import { clsx } from 'clsx';
 import { FontAwesome } from '@expo/vector-icons';
 
 interface InputProps extends TextInputProps {

@@ -1,11 +1,10 @@
 import React, { useState } from 'react';
-import { View, Text, Modal, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, Modal, ScrollView, TouchableOpacity, Image } from 'react-native';
 import { PainScale } from './PainScale';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { FontAwesome } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { Image } from 'react-native';
 
 interface IntakeWizardProps {
   visible: boolean;

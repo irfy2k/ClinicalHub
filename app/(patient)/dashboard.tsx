@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Modal, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { FontAwesome } from '@expo/vector-icons';
@@ -30,7 +30,6 @@ export default function DashboardScreen() {
     spo2: user?.medical_history?.vitals?.spo2 || ''
   });
   const [nextAppt, setNextAppt] = useState<any>(null);
-  const [latestApptId, setLatestApptId] = useState<string | null>(null);
 
   // Dynamic counts from Firebase
   const [activeScripts, setActiveScripts] = useState(0);
@@ -55,8 +54,6 @@ export default function DashboardScreen() {
       .sort((a, b) => new Date(b.scheduled_at).getTime() - new Date(a.scheduled_at).getTime());
     
     setAllAppointments(allSorted);
-    setLatestApptId(allSorted.length > 0 ? allSorted[0].id : null);
-    
     // Calculate total unread messages for patient
     const unread = allSorted.reduce((sum, a) => sum + (a.unread_count_patient || 0), 0);
     setTotalUnread(unread);

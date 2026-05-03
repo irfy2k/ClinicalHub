@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
-import clsx from 'clsx';
+import { clsx } from 'clsx';
 import { FontAwesome } from '@expo/vector-icons';
 
 interface PainScaleProps {

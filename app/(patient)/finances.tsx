@@ -8,7 +8,7 @@ import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import Svg, { Path, Circle } from 'react-native-svg';
-import clsx from 'clsx';
+import { clsx } from 'clsx';
 
 // Expense type config
 const EXPENSE_CONFIG: Record<ExpenseType, { label: string; color: string; icon: string }> = {
@@ -114,7 +114,7 @@ export default function FinancesScreen() {
     try {
       const data = await Services.finance.getByPatient(user.id);
       setExpenses(data);
-    } catch (error) {
+    } catch {
       Alert.alert('Error', 'Failed to load finances. Please try again.');
     } finally {
       setIsLoading(false);
@@ -156,7 +156,7 @@ export default function FinancesScreen() {
       setIsAdding(false);
       loadExpenses();
       Alert.alert('Success', 'Expense recorded successfully.');
-    } catch (error) {
+    } catch {
       Alert.alert('Error', 'Failed to save expense.');
     }
   };

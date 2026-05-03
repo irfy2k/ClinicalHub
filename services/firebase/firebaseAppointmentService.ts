@@ -1,6 +1,20 @@
-import { ref, push, get, set, query, orderByChild, equalTo, update } from 'firebase/database';
+import { ref, push, get, set, query, orderByChild, equalTo, update, remove, runTransaction } from 'firebase/database';
 import { database, cleanObject } from './firebaseConfig';
 import { Appointment } from '../../types/database';
+
+const ACTIVE_APPOINTMENT_STATUSES: Appointment['status'][] = ['pending', 'confirmed'];
+
+function buildSlotKey(doctorId: string, scheduledAt: string): string {
+  const safeDate = scheduledAt.replace(/[:.]/g, '-');
+  return `${doctorId}__${safeDate}`;
+}
+
+export class SlotAlreadyBookedError extends Error {
+  constructor() {
+    super('The selected appointment slot is no longer available.');
+    this.name = 'SlotAlreadyBookedError';
+  }
+}
 
 /**
  * Firebase Appointment Service
@@ -64,10 +78,59 @@ export const firebaseAppointmentService = {
     }
   },
 
+  async createWithSlotLock(appointment: Omit<Appointment, 'id' | 'created_at'>): Promise<Appointment> {
+    const slotKey = buildSlotKey(appointment.doctor_id, appointment.scheduled_at);
+    const slotRef = ref(database, `appointment_slots/${slotKey}`);
+    const appointmentsRef = ref(database, 'appointments');
+    const newRef = push(appointmentsRef);
+    const appointmentId = newRef.key!;
+
+    const lockResult = await runTransaction(slotRef, (currentValue) => {
+      if (currentValue) return;
+      return {
+        appointment_id: appointmentId,
+        doctor_id: appointment.doctor_id,
+        scheduled_at: appointment.scheduled_at,
+        status: appointment.status,
+        created_at: new Date().toISOString(),
+      };
+    });
+
+    if (!lockResult.committed) {
+      throw new SlotAlreadyBookedError();
+    }
+
+    try {
+      const newAppt: Omit<Appointment, 'id'> = {
+        ...appointment,
+        created_at: new Date().toISOString(),
+      };
+      await set(newRef, cleanObject(newAppt));
+      return { id: appointmentId, ...newAppt };
+    } catch (error) {
+      await remove(slotRef);
+      console.error('[Firebase Appointments] createWithSlotLock error:', error);
+      throw error;
+    }
+  },
+
   async updateStatus(id: string, status: Appointment['status']): Promise<void> {
     try {
-      const apptRef = ref(database, `appointments/${id}/status`);
-      await set(apptRef, status);
+      const appointmentRef = ref(database, `appointments/${id}`);
+      const appointmentSnapshot = await get(appointmentRef);
+      if (!appointmentSnapshot.exists()) {
+        throw new Error('Appointment not found');
+      }
+
+      const appointment = appointmentSnapshot.val() as Omit<Appointment, 'id'>;
+      await set(ref(database, `appointments/${id}/status`), status);
+
+      const wasActive = ACTIVE_APPOINTMENT_STATUSES.includes(appointment.status);
+      const isNowActive = ACTIVE_APPOINTMENT_STATUSES.includes(status);
+      if (wasActive && !isNowActive) {
+        const slotKey = buildSlotKey(appointment.doctor_id, appointment.scheduled_at);
+        await remove(ref(database, `appointment_slots/${slotKey}`));
+      }
     } catch (error) {
       console.error('[Firebase Appointments] updateStatus error:', error);
       throw error;

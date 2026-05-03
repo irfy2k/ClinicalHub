@@ -52,9 +52,8 @@ logs/
 *.sln
 *.sw?
 
-# Documentation and Data (User requested)
+# Documentation and Data
 *.md
-*.json
 
 # Exceptions for critical configuration (optional but recommended)
 !package.json

@@ -1,5 +1,5 @@
 import { TouchableOpacity, Text, TouchableOpacityProps } from 'react-native';
-import clsx from 'clsx';
+import { clsx } from 'clsx';
 
 interface ButtonProps extends TouchableOpacityProps {
   label: string;

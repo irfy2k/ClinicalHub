@@ -1,14 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Modal, Image, Alert, RefreshControl, ActivityIndicator } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { FontAwesome } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { Services } from '../../services';
-import { Appointment, User } from '../../types/database';
+import { Appointment } from '../../types/database';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { notificationService } from '../../services/notificationService';
-import clsx from 'clsx';
+import { clsx } from 'clsx';
 import { useRouter } from 'expo-router';
 
 export default function QueueScreen() {
@@ -20,13 +20,7 @@ export default function QueueScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  useFocusEffect(
-    React.useCallback(() => {
-      loadAppointments();
-    }, [user])
-  );
-
-  const loadAppointments = async () => {
+  const loadAppointments = useCallback(async () => {
     if (!user) return;
     try {
       const data = await Services.appointment.getByDoctor(user.id);
@@ -47,13 +41,19 @@ export default function QueueScreen() {
         })
       );
       setPatientNames(names);
-    } catch (error) {
+    } catch {
       Alert.alert('Error', 'Failed to load appointments. Please try again.');
     } finally {
       setIsLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [user]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadAppointments();
+    }, [loadAppointments])
+  );
 
   const onRefresh = () => {
     setRefreshing(true);

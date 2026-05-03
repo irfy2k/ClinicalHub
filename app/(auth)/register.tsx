@@ -4,9 +4,7 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '../../context/AuthContext';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
-import { Card } from '../../components/ui/Card';
 import { UserRole } from '../../types/database';
-import clsx from 'clsx';
 import { FontAwesome } from '@expo/vector-icons';
 
 /**

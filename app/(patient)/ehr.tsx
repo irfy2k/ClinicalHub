@@ -37,7 +37,7 @@ export default function MedicalVaultScreen() {
     try {
       const docs = await Services.document.getByPatient(user.id);
       setDocuments(docs);
-    } catch (error) {
+    } catch {
       Alert.alert('Error', 'Failed to load records. Please try again.');
     } finally {
       setIsLoading(false);
@@ -95,11 +95,6 @@ export default function MedicalVaultScreen() {
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`;
     return `${(bytes / 1048576).toFixed(1)} MB`;
-  };
-
-  const formatDate = (dateStr: string) => {
-    const d = new Date(dateStr);
-    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   };
 
   const FilterButton = ({ label }: { label: FilterKey }) => (

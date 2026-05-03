@@ -6,11 +6,9 @@ import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { DefaultAvatar } from '../../components/ui/DefaultAvatar';
 import { useAuth } from '../../context/AuthContext';
-import { useRouter } from 'expo-router';
 
 export default function PatientProfileScreen() {
   const { user, logout, updateUser } = useAuth();
-  const router = useRouter();
 
   const [name, setName] = useState(user?.name || '');
   const [phone, setPhone] = useState(user?.phone_number || '');

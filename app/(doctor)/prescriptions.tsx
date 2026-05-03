@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import clsx from 'clsx';
+import { clsx } from 'clsx';
 import { View, Text, ScrollView, TouchableOpacity, Modal, Alert, RefreshControl, ActivityIndicator } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
@@ -9,7 +9,7 @@ import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { notificationService } from '../../services/notificationService';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 
 const TIME_SLOTS = [
   '06:00', '07:00', '08:00', '09:00', '10:00', '11:00', '12:00',
@@ -55,7 +55,7 @@ export default function DoctorPrescriptions() {
 
   useEffect(() => {
     loadData();
-  }, [user]);
+  }, [loadData]);
 
   useEffect(() => {
     if (params?.patientId && typeof params.patientId === 'string') {
