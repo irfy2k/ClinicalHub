@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, RefreshControl, ActivityIndicator, Alert } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { Services } from '../../services';
@@ -12,6 +12,8 @@ export default function DoctorAppointments() {
   const { user } = useAuth();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [filter, setFilter] = useState<'Upcoming' | 'Past'>('Upcoming');
+  const [refreshing, setRefreshing] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
 
   useEffect(() => {
@@ -20,8 +22,20 @@ export default function DoctorAppointments() {
 
   const loadAppointments = async () => {
     if (!user) return;
-    const data = await Services.appointment.getByDoctor(user.id);
-    setAppointments(data);
+    try {
+      const data = await Services.appointment.getByDoctor(user.id);
+      setAppointments(data);
+    } catch (error) {
+      Alert.alert('Error', 'Failed to load appointments.');
+    } finally {
+      setIsLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    loadAppointments();
   };
 
   const filteredAppointments = appointments.filter(appt => {
@@ -52,8 +66,16 @@ export default function DoctorAppointments() {
         </View>
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: 24 }}>
-        {filteredAppointments.length === 0 ? (
+      <ScrollView 
+        contentContainerStyle={{ padding: 24 }}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#85B523" />}
+      >
+        {isLoading ? (
+          <View className="items-center justify-center py-20">
+            <ActivityIndicator size="large" color="#85B523" />
+            <Text className="text-textMuted mt-4">Loading schedule...</Text>
+          </View>
+        ) : filteredAppointments.length === 0 ? (
           <View className="items-center justify-center py-20">
             <FontAwesome name="calendar-times-o" size={48} color="#2F333A" />
             <Text className="text-textMuted mt-4">No appointments found</Text>

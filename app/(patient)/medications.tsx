@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Alert, Switch } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Alert, Switch, RefreshControl, ActivityIndicator } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { Services } from '../../services';
@@ -23,21 +23,24 @@ export default function MedicationsScreen() {
   const [logs, setLogs] = useState<MedicationLog[]>([]);
   const [timeline, setTimeline] = useState<TimelineEntry[]>([]);
   const [remindersEnabled, setRemindersEnabled] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   const loadData = useCallback(async () => {
     if (!user) return;
-    const prescData = await Services.prescription.getByPatient(user.id);
-    setPrescriptions(prescData);
+    try {
+      const prescData = await Services.prescription.getByPatient(user.id);
+      setPrescriptions(prescData);
 
-    // Load all logs for active prescriptions
-    const allLogs: MedicationLog[] = [];
-    for (const p of prescData.filter(p => p.is_active)) {
-      const prescLogs = await Services.prescription.getLogsByPrescription(p.id);
-      allLogs.push(...prescLogs);
-    }
-    setLogs(allLogs);
+      // Load all logs for active prescriptions
+      const allLogs: MedicationLog[] = [];
+      for (const p of prescData.filter(p => p.is_active)) {
+        const prescLogs = await Services.prescription.getLogsByPrescription(p.id);
+        allLogs.push(...prescLogs);
+      }
+      setLogs(allLogs);
 
-    // Build today's timeline from active prescriptions
+      // Build today's timeline from active prescriptions
     const todayEntries: TimelineEntry[] = [];
     const today = new Date().toISOString().split('T')[0];
 
@@ -66,14 +69,25 @@ export default function MedicationsScreen() {
     setTimeline(todayEntries);
 
     // Schedule medication reminders if enabled
-    if (remindersEnabled) {
-      await notificationService.scheduleAllMedicationReminders(prescData);
+      if (remindersEnabled) {
+        await notificationService.scheduleAllMedicationReminders(prescData);
+      }
+    } catch (e) {
+      Alert.alert('Error', 'Failed to load medications. Please try again.');
+    } finally {
+      setIsLoading(false);
+      setRefreshing(false);
     }
   }, [user, remindersEnabled]);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    loadData();
+  };
 
   const handleToggle = async (entry: TimelineEntry) => {
     let newStatus: 'taken' | 'skipped' | 'pending';
@@ -183,8 +197,16 @@ export default function MedicationsScreen() {
         <Text className="text-textLight font-bold mt-4 mb-2">Today's Schedule</Text>
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: 24, paddingTop: 4 }}>
-        {timeline.length === 0 ? (
+      <ScrollView 
+        contentContainerStyle={{ padding: 24, paddingTop: 4 }}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#85B523" />}
+      >
+        {isLoading ? (
+          <View className="items-center justify-center py-16">
+            <ActivityIndicator size="large" color="#85B523" />
+            <Text className="text-textMuted mt-4">Loading medications...</Text>
+          </View>
+        ) : timeline.length === 0 ? (
           <View className="items-center justify-center py-16">
             <FontAwesome name="check-circle" size={48} color="#2F333A" />
             <Text className="text-textMuted mt-4">No medications scheduled for today</Text>

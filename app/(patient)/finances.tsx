@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Modal, Alert } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Modal, Alert, RefreshControl, ActivityIndicator } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { Services } from '../../services';
@@ -21,18 +21,33 @@ const EXPENSE_CONFIG: Record<ExpenseType, { label: string; color: string; icon: 
 type FilterKey = 'All' | ExpenseType;
 
 // Simple pie chart component using react-native-svg
-function PieChart({ data }: { data: { type: ExpenseType; amount: number }[] }) {
-  const total = data.reduce((sum, d) => sum + d.amount, 0);
-  if (total === 0) return null;
+function PieChart({ expenses, size = 180 }: { expenses: HealthExpense[], size?: number }) {
+  const aggregated = (['consultation', 'medication', 'lab', 'other'] as ExpenseType[]).map(type => ({
+    type,
+    amount: expenses
+      .filter(e => e.expense_type === type)
+      .reduce((sum, e) => sum + e.amount, 0),
+  }));
 
-  const size = 160;
-  const radius = 64;
+  const total = aggregated.reduce((sum, d) => sum + d.amount, 0);
+  if (total === 0) {
+    return (
+      <View className="items-center justify-center" style={{ width: size, height: size }}>
+        <View className="w-24 h-24 rounded-full bg-surfaceLight border border-borderDark items-center justify-center">
+          <FontAwesome name="pie-chart" size={32} color="#2F333A" />
+        </View>
+        <Text className="text-textMuted text-xs mt-3">No data</Text>
+      </View>
+    );
+  }
+
+  const radius = size * 0.4;
   const center = size / 2;
-  const innerRadius = 40;
+  const innerRadius = size * 0.25;
 
   let currentAngle = -Math.PI / 2; // Start from top
 
-  const slices = data.filter(d => d.amount > 0).map(d => {
+  const slices = aggregated.filter(d => d.amount > 0).map(d => {
     const sliceAngle = (d.amount / total) * 2 * Math.PI;
     const startAngle = currentAngle;
     const endAngle = currentAngle + sliceAngle;
@@ -62,8 +77,6 @@ function PieChart({ data }: { data: { type: ExpenseType; amount: number }[] }) {
     return {
       path,
       color: EXPENSE_CONFIG[d.type].color,
-      type: d.type,
-      percentage: Math.round((d.amount / total) * 100),
     };
   });
 
@@ -76,7 +89,7 @@ function PieChart({ data }: { data: { type: ExpenseType; amount: number }[] }) {
         <Circle cx={center} cy={center} r={innerRadius - 2} fill="#1A1D21" />
       </Svg>
       <View className="absolute" style={{ top: size / 2 - 16, alignItems: 'center' }}>
-        <Text className="text-textLight font-bold text-lg">${total.toFixed(0)}</Text>
+        <Text className="text-textLight font-bold text-lg">Rs. {total.toFixed(0)}</Text>
         <Text className="text-textMuted text-[10px] uppercase">Total</Text>
       </View>
     </View>
@@ -93,26 +106,30 @@ export default function FinancesScreen() {
   const [newType, setNewType] = useState<ExpenseType>('consultation');
   const [newAmount, setNewAmount] = useState('');
   const [newDescription, setNewDescription] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   const loadExpenses = useCallback(async () => {
     if (!user) return;
-    const data = await Services.expense.getByPatient(user.id);
-    setExpenses(data);
+    try {
+      const data = await Services.finance.getByPatient(user.id);
+      setExpenses(data);
+    } catch (error) {
+      Alert.alert('Error', 'Failed to load finances. Please try again.');
+    } finally {
+      setIsLoading(false);
+      setRefreshing(false);
+    }
   }, [user]);
 
   useEffect(() => {
     loadExpenses();
   }, [loadExpenses]);
 
-  // Aggregate by type for pie chart
-  const aggregated = (['consultation', 'medication', 'lab', 'other'] as ExpenseType[]).map(type => ({
-    type,
-    amount: expenses
-      .filter(e => e.expense_type === type)
-      .reduce((sum, e) => sum + e.amount, 0),
-  }));
-
-  const totalSpent = expenses.reduce((sum, e) => sum + e.amount, 0);
+  const onRefresh = () => {
+    setRefreshing(true);
+    loadExpenses();
+  };
 
   const filteredExpenses = expenses
     .filter(e => activeFilter === 'All' || e.expense_type === activeFilter)
@@ -124,19 +141,24 @@ export default function FinancesScreen() {
       return;
     }
 
-    await Services.expense.create({
-      patient_id: user.id,
-      expense_type: newType,
-      amount: parseFloat(newAmount),
-      description: newDescription,
-      date_incurred: new Date().toISOString(),
-    });
+    try {
+      await Services.finance.create({
+        patient_id: user.id,
+        expense_type: newType,
+        amount: parseFloat(newAmount),
+        description: newDescription,
+        date_incurred: new Date().toISOString(),
+      });
 
-    setNewAmount('');
-    setNewDescription('');
-    setNewType('consultation');
-    setIsAdding(false);
-    loadExpenses();
+      setNewAmount('');
+      setNewDescription('');
+      setNewType('consultation');
+      setIsAdding(false);
+      loadExpenses();
+      Alert.alert('Success', 'Expense recorded successfully.');
+    } catch (error) {
+      Alert.alert('Error', 'Failed to save expense.');
+    }
   };
 
   const formatDate = (dateStr: string) => {
@@ -146,14 +168,13 @@ export default function FinancesScreen() {
 
   const FilterButton = ({ label, value }: { label: string; value: FilterKey }) => (
     <TouchableOpacity
-      className={activeFilter === value
-        ? "bg-primary px-4 py-2 rounded-full mr-2"
-        : "bg-surfaceLight border border-borderDark px-4 py-2 rounded-full mr-2"}
+      className={clsx(
+        "px-4 py-2 rounded-full mr-2 border",
+        activeFilter === value ? "bg-primary border-primary" : "bg-surfaceLight border-borderDark"
+      )}
       onPress={() => setActiveFilter(value)}
     >
-      <Text className={activeFilter === value
-        ? "text-background font-bold"
-        : "text-textLight font-semibold"}>
+      <Text className={clsx("font-bold", activeFilter === value ? "text-background" : "text-textLight")}>
         {label}
       </Text>
     </TouchableOpacity>
@@ -166,43 +187,40 @@ export default function FinancesScreen() {
         <Text className="text-textMuted text-sm mb-4">Track your healthcare spending by category.</Text>
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: 24, paddingTop: 4 }}>
-        {/* Pie Chart Dashboard */}
-        <Card className="mb-6">
-          <View className="flex-row items-center justify-between">
-            {/* Chart */}
-            <PieChart data={aggregated} />
-
-            {/* Legend */}
-            <View className="flex-1 ml-6">
-              {aggregated.map(item => (
-                <View key={item.type} className="flex-row items-center mb-3">
-                  <View
-                    className="w-3 h-3 rounded-full mr-2"
-                    style={{ backgroundColor: EXPENSE_CONFIG[item.type].color }}
-                  />
-                  <View className="flex-1">
-                    <Text className="text-textMuted text-xs">{EXPENSE_CONFIG[item.type].label}</Text>
-                    <Text className="text-textLight font-bold">${item.amount.toFixed(2)}</Text>
-                  </View>
+      <ScrollView 
+        contentContainerStyle={{ padding: 24, paddingTop: 8 }}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#85B523" />}
+      >
+        <Text className="text-textLight font-bold mb-4">Financial Overview</Text>
+        
+        {isLoading ? (
+          <View className="items-center justify-center py-20">
+            <ActivityIndicator size="large" color="#85B523" />
+            <Text className="text-textMuted mt-4">Loading finances...</Text>
+          </View>
+        ) : (
+          <Card className="mb-6 items-center py-6">
+            <PieChart expenses={expenses} size={180} />
+            <View className="flex-row flex-wrap justify-center mt-6 gap-x-4 gap-y-2">
+              {(['consultation', 'medication', 'lab', 'other'] as ExpenseType[]).map(type => (
+                <View key={type} className="flex-row items-center">
+                  <View className="w-3 h-3 rounded-full mr-2" style={{ backgroundColor: EXPENSE_CONFIG[type].color }} />
+                  <Text className="text-textMuted text-xs font-bold uppercase tracking-wider">{EXPENSE_CONFIG[type].label}</Text>
                 </View>
               ))}
             </View>
-          </View>
+          </Card>
+        )}
 
-          <View className="h-px bg-borderDark my-4" />
-
-          <View className="flex-row justify-between items-center">
-            <View>
-              <Text className="text-textMuted text-xs uppercase tracking-widest mb-1">Total Spending</Text>
-              <Text className="text-2xl font-bold text-textLight">${totalSpent.toFixed(2)}</Text>
-            </View>
-            <Button label="+ Add" className="px-6" onPress={() => setIsAdding(true)} />
-          </View>
-        </Card>
+        <View className="flex-row justify-between items-center mb-4">
+          <Text className="text-textLight font-bold">Transaction History</Text>
+          <TouchableOpacity onPress={() => setIsAdding(true)}>
+             <Text className="text-primary font-bold">Add Expense</Text>
+          </TouchableOpacity>
+        </View>
 
         {/* Filters */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-4">
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-6">
           <FilterButton label="All" value="All" />
           <FilterButton label="Consults" value="consultation" />
           <FilterButton label="Meds" value="medication" />
@@ -210,13 +228,10 @@ export default function FinancesScreen() {
           <FilterButton label="Other" value="other" />
         </ScrollView>
 
-        {/* Transaction List */}
-        <Text className="text-textLight font-bold mb-4">Transaction History</Text>
-
-        {filteredExpenses.length === 0 ? (
+        {!isLoading && filteredExpenses.length === 0 ? (
           <View className="items-center justify-center py-16">
             <FontAwesome name="file-text-o" size={48} color="#2F333A" />
-            <Text className="text-textMuted mt-4">No expenses found</Text>
+            <Text className="text-textMuted mt-4">No transactions found</Text>
           </View>
         ) : (
           filteredExpenses.map(expense => {
@@ -241,7 +256,7 @@ export default function FinancesScreen() {
                       </View>
                     </View>
                   </View>
-                  <Text className="text-textLight font-bold text-lg">${expense.amount.toFixed(2)}</Text>
+                  <Text className="text-textLight font-bold text-lg">Rs. {expense.amount.toFixed(0)}</Text>
                 </View>
               </Card>
             );
@@ -251,7 +266,7 @@ export default function FinancesScreen() {
         <View className="items-center py-8">
           <FontAwesome name="shield" size={24} color="#2F333A" />
           <Text className="text-textMuted text-xs mt-3 text-center px-8">
-            Financial data is encrypted and stored securely. We do not share your data with third parties.
+            Financial data is stored securely in clinical systems.
           </Text>
         </View>
       </ScrollView>
@@ -287,16 +302,16 @@ export default function FinancesScreen() {
           </View>
 
           <Input
-            label="Amount ($)"
-            placeholder="e.g. 75.00"
+            label="Amount (Rs.)"
+            placeholder="e.g. 1500"
             value={newAmount}
             onChangeText={setNewAmount}
-            keyboardType="decimal-pad"
+            keyboardType="numeric"
           />
 
           <Input
             label="Description"
-            placeholder="e.g. Annual checkup co-pay"
+            placeholder="e.g. Follow-up consultation"
             value={newDescription}
             onChangeText={setNewDescription}
           />

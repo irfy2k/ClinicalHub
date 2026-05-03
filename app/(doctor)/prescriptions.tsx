@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import clsx from 'clsx';
-import { View, Text, ScrollView, TouchableOpacity, Modal, Alert } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Modal, Alert, RefreshControl, ActivityIndicator } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { Services } from '../../services';
@@ -24,6 +24,8 @@ export default function DoctorPrescriptions() {
   const [filter, setFilter] = useState<'Active' | 'All'>('Active');
   const [isCreating, setIsCreating] = useState(false);
   const [patientUsers, setPatientUsers] = useState<User[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   // New prescription form state
   const [medName, setMedName] = useState('');
@@ -48,8 +50,20 @@ export default function DoctorPrescriptions() {
 
   const loadPrescriptions = async () => {
     if (!user) return;
-    const data = await Services.prescription.getByDoctor(user.id);
-    setPrescriptions(data);
+    try {
+      const data = await Services.prescription.getByDoctor(user.id);
+      setPrescriptions(data);
+    } catch (error) {
+      Alert.alert('Error', 'Failed to load prescriptions.');
+    } finally {
+      setIsLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    loadPrescriptions();
   };
 
   const loadPatients = async () => {
@@ -107,7 +121,7 @@ export default function DoctorPrescriptions() {
 
     // Automatically generate a health expense for the patient if a cost was entered
     if (costEstimate && parseFloat(costEstimate) > 0) {
-      await Services.finance.addExpense({
+      await Services.finance.create({
         patient_id: selectedPatientId,
         expense_type: 'medication',
         amount: parseFloat(costEstimate),
@@ -129,6 +143,24 @@ export default function DoctorPrescriptions() {
     setIsCreating(false);
     loadPrescriptions();
     Alert.alert('Success', 'Prescription created and reminders scheduled.');
+  };
+
+  const handleToggleStatus = (id: string, currentStatus: boolean) => {
+    Alert.alert(
+      currentStatus ? 'Discontinue Medication' : 'Reactivate Medication',
+      `Are you sure you want to ${currentStatus ? 'discontinue' : 'reactivate'} this prescription?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Confirm', 
+          style: currentStatus ? 'destructive' : 'default',
+          onPress: async () => {
+            await Services.prescription.updateStatus(id, !currentStatus);
+            loadPrescriptions();
+          }
+        }
+      ]
+    );
   };
 
   const filtered = filter === 'Active'
@@ -157,8 +189,16 @@ export default function DoctorPrescriptions() {
         </View>
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: 24 }}>
-        {filtered.length === 0 ? (
+      <ScrollView 
+        contentContainerStyle={{ padding: 24 }}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#85B523" />}
+      >
+        {isLoading ? (
+          <View className="items-center justify-center py-20">
+            <ActivityIndicator size="large" color="#85B523" />
+            <Text className="text-textMuted mt-4">Loading prescriptions...</Text>
+          </View>
+        ) : filtered.length === 0 ? (
           <View className="items-center justify-center py-20">
             <FontAwesome name="file-text-o" size={48} color="#2F333A" />
             <Text className="text-textMuted mt-4">No prescriptions found</Text>
@@ -185,7 +225,7 @@ export default function DoctorPrescriptions() {
                 </View>
                 {presc.cost_estimate && (
                   <View className="bg-surfaceLight px-3 py-1.5 rounded-lg border border-borderDark">
-                    <Text className="text-textLight font-bold">${presc.cost_estimate.toFixed(2)}</Text>
+                    <Text className="text-textLight font-bold">Rs. {presc.cost_estimate.toFixed(2)}</Text>
                     <Text className="text-textMuted text-[10px] uppercase">Est. Cost</Text>
                   </View>
                 )}
@@ -207,11 +247,18 @@ export default function DoctorPrescriptions() {
                 </Text>
               </View>
 
-              <View className="flex-row items-center">
-                <FontAwesome name="calendar" size={12} color="#94A3B8" />
-                <Text className="text-textMuted text-sm ml-2">
-                  {presc.start_date}{presc.end_date ? ` → ${presc.end_date}` : ' → Ongoing'}
-                </Text>
+              <View className="flex-row items-center justify-between">
+                <View className="flex-row items-center">
+                  <FontAwesome name="calendar" size={12} color="#94A3B8" />
+                  <Text className="text-textMuted text-sm ml-2">
+                    {presc.start_date}{presc.end_date ? ` → ${presc.end_date}` : ' → Ongoing'}
+                  </Text>
+                </View>
+                <TouchableOpacity onPress={() => handleToggleStatus(presc.id, presc.is_active)}>
+                  <Text className={clsx("font-bold text-sm", presc.is_active ? "text-red-400" : "text-primary")}>
+                    {presc.is_active ? 'Discontinue' : 'Reactivate'}
+                  </Text>
+                </TouchableOpacity>
               </View>
             </Card>
           ))
@@ -285,7 +332,7 @@ export default function DoctorPrescriptions() {
             onChangeText={setDosage}
           />
           <Input
-            label="Cost Estimate ($)"
+            label="Cost Estimate (Rs.)"
             placeholder="e.g. 15.50"
             value={costEstimate}
             onChangeText={setCostEstimate}

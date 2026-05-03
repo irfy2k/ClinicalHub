@@ -6,7 +6,7 @@ import {
   sendPasswordResetEmail,
   User as FirebaseUser,
 } from 'firebase/auth';
-import { ref, set, get, query, orderByChild, equalTo } from 'firebase/database';
+import { ref, set, get, update, query, orderByChild, equalTo } from 'firebase/database';
 import { auth, database } from './firebaseConfig';
 import { User } from '../../types/database';
 
@@ -167,12 +167,9 @@ export const firebaseAuthService = {
   async updateProfile(uid: string, updates: Partial<User>): Promise<void> {
     try {
       const userRef = ref(database, `users/${uid}`);
-      const snapshot = await get(userRef);
-
-      if (snapshot.exists()) {
-        const currentData = snapshot.val();
-        await set(userRef, { ...currentData, ...updates });
-      }
+      // Use atomic update() to prevent race conditions from concurrent writes
+      const { id, ...safeUpdates } = updates as any;
+      await update(userRef, safeUpdates);
     } catch (error) {
       console.error('[Firebase Auth] updateProfile error:', error);
       throw error;

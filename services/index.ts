@@ -15,7 +15,7 @@ export const Services = {
   auth: firebaseAuthService,
   appointment: firebaseAppointmentService,
   prescription: firebasePrescriptionService,
-  expense: firebaseExpenseService,
+  finance: firebaseExpenseService,
   document: firebaseDocumentService,
   chat: firebaseChatService,
 };

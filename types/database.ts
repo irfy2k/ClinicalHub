@@ -11,6 +11,7 @@ export interface User {
   role: UserRole;
   name: string;
   email: string;
+  specialty?: string;
   phone_number?: string;
   avatar_url?: string;
   medical_history?: Record<string, any>;

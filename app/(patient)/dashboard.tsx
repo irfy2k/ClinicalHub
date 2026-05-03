@@ -1,50 +1,82 @@
-import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Modal, KeyboardAvoidingView, Platform } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, Modal, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
+import { Services } from '../../services';
 import { Card } from '../../components/ui/Card';
 import { DefaultAvatar } from '../../components/ui/DefaultAvatar';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { useRouter } from 'expo-router';
 
+function getGreeting(): string {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'Good Morning';
+  if (hour < 17) return 'Good Afternoon';
+  return 'Good Evening';
+}
+
 export default function DashboardScreen() {
-  const { user, logout } = useAuth();
+  const { user, updateUser } = useAuth();
   const router = useRouter();
 
   const [isVitalsModalVisible, setIsVitalsModalVisible] = useState(false);
+  // Initialize vitals from persisted medical_history if available
   const [vitals, setVitals] = useState({
-    bp: '118/76',
-    hr: '72',
-    temp: '98.6',
-    spo2: '99'
+    bp: user?.medical_history?.vitals?.bp || '',
+    hr: user?.medical_history?.vitals?.hr || '',
+    temp: user?.medical_history?.vitals?.temp || '',
+    spo2: user?.medical_history?.vitals?.spo2 || ''
   });
   const [nextAppt, setNextAppt] = useState<any>(null);
+  const [latestApptId, setLatestApptId] = useState<string | null>(null);
+
+  // Dynamic counts from Firebase
+  const [activeScripts, setActiveScripts] = useState(0);
+  const [docCount, setDocCount] = useState(0);
+
+  const loadDashboardData = useCallback(async () => {
+    if (!user) return;
+
+    // Load next appointment
+    const appts = await Services.appointment.getByPatient(user.id);
+    const upcoming = appts
+      .filter(a => a.status === 'pending' || a.status === 'confirmed')
+      .sort((a, b) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime());
+    setNextAppt(upcoming.length > 0 ? upcoming[0] : null);
+
+    // Find most recent appointment for messages shortcut
+    const allSorted = appts
+      .filter(a => a.status !== 'cancelled')
+      .sort((a, b) => new Date(b.scheduled_at).getTime() - new Date(a.scheduled_at).getTime());
+    setLatestApptId(allSorted.length > 0 ? allSorted[0].id : null);
+
+    // Load active prescriptions count
+    const prescData = await Services.prescription.getByPatient(user.id);
+    setActiveScripts(prescData.filter(p => p.is_active).length);
+
+    // Load documents count
+    const docs = await Services.document.getByPatient(user.id);
+    setDocCount(docs.length);
+  }, [user]);
 
   useEffect(() => {
-    const loadNextAppt = async () => {
-      if (!user) return;
-      const { Services } = await import('../../services');
-      const data = await Services.appointment.getByPatient(user.id);
-      
-      const upcoming = data
-        .filter(a => a.status === 'pending' || a.status === 'confirmed')
-        .sort((a, b) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime());
-        
-      if (upcoming.length > 0) {
-        setNextAppt(upcoming[0]);
-      } else {
-        setNextAppt(null);
-      }
-    };
-    loadNextAppt();
-  }, [user]);
+    loadDashboardData();
+  }, [loadDashboardData]);
 
   const [editVitals, setEditVitals] = useState(vitals);
 
   const handleSaveVitals = () => {
     setVitals(editVitals);
+    // Persist vitals to Firebase via medical_history
+    updateUser({
+      medical_history: {
+        ...user?.medical_history,
+        vitals: editVitals
+      }
+    });
     setIsVitalsModalVisible(false);
+    Alert.alert('Saved', 'Vitals have been recorded and synced.');
   };
 
   return (
@@ -53,7 +85,7 @@ export default function DashboardScreen() {
       <View className="flex-row items-center justify-between mb-8">
         <View>
           <Text className="text-textMuted text-sm tracking-wider uppercase mb-1">Clinical Hub</Text>
-          <Text className="text-2xl font-bold text-textLight">Hi, {user?.name?.split(' ')[0] || 'Patient'}</Text>
+          <Text className="text-2xl font-bold text-textLight">{getGreeting()}, {user?.name?.split(' ')[0] || 'Patient'}</Text>
         </View>
         <TouchableOpacity 
            onPress={() => router.push('/(patient)/profile')}
@@ -70,48 +102,56 @@ export default function DashboardScreen() {
       <Card className="mb-6 relative">
         <TouchableOpacity 
           className="absolute top-4 right-4 z-10 w-8 h-8 rounded-full bg-surfaceLight border border-borderDark flex items-center justify-center"
-          onPress={() => setIsVitalsModalVisible(true)}
+          onPress={() => { setEditVitals(vitals); setIsVitalsModalVisible(true); }}
         >
           <FontAwesome name="edit" size={12} color="#E2E8F0" />
         </TouchableOpacity>
 
-        <View className="flex-row justify-between mb-6">
-          <View>
-            <View className="flex-row items-center mb-1">
-              <FontAwesome name="heartbeat" size={12} color="#94A3B8" />
-              <Text className="text-textMuted text-xs ml-2 uppercase tracking-wide">Blood Pressure</Text>
+        {vitals.bp || vitals.hr ? (
+          <>
+            <View className="flex-row justify-between mb-6">
+              <View>
+                <View className="flex-row items-center mb-1">
+                  <FontAwesome name="heartbeat" size={12} color="#94A3B8" />
+                  <Text className="text-textMuted text-xs ml-2 uppercase tracking-wide">Blood Pressure</Text>
+                </View>
+                <Text className="text-2xl font-bold text-textLight">{vitals.bp || '—'} <Text className="text-sm font-normal text-textMuted">mmHg</Text></Text>
+              </View>
+              <View className="mr-8">
+                <View className="flex-row items-center mb-1">
+                  <FontAwesome name="heart" size={12} color="#94A3B8" />
+                  <Text className="text-textMuted text-xs ml-2 uppercase tracking-wide">Heart Rate</Text>
+                </View>
+                <Text className="text-2xl font-bold text-textLight">{vitals.hr || '—'} <Text className="text-sm font-normal text-textMuted">bpm</Text></Text>
+              </View>
             </View>
-            <Text className="text-2xl font-bold text-textLight">{vitals.bp} <Text className="text-sm font-normal text-textMuted">mmHg</Text></Text>
-            <Text className="text-primary text-xs font-bold mt-1">Live Update</Text>
-          </View>
-          <View className="mr-8">
-            <View className="flex-row items-center mb-1">
-              <FontAwesome name="heart" size={12} color="#94A3B8" />
-              <Text className="text-textMuted text-xs ml-2 uppercase tracking-wide">Heart Rate</Text>
+            
+            <View className="h-px bg-borderDark mb-6 w-full" />
+            
+            <View className="flex-row justify-between">
+              <View>
+                <View className="flex-row items-center mb-1">
+                  <FontAwesome name="thermometer-half" size={12} color="#94A3B8" />
+                  <Text className="text-textMuted text-xs ml-2 uppercase tracking-wide">Temperature</Text>
+                </View>
+                <Text className="text-textLight font-bold text-lg">{vitals.temp || '—'} <Text className="text-xs font-normal text-textMuted">°F</Text></Text>
+              </View>
+              <View className="mr-8">
+                <View className="flex-row items-center mb-1">
+                  <FontAwesome name="tint" size={12} color="#94A3B8" />
+                  <Text className="text-textMuted text-xs ml-2 uppercase tracking-wide">SpO2</Text>
+                </View>
+                <Text className="text-textLight font-bold text-lg">{vitals.spo2 || '—'} <Text className="text-xs font-normal text-textMuted">%</Text></Text>
+              </View>
             </View>
-            <Text className="text-2xl font-bold text-textLight">{vitals.hr} <Text className="text-sm font-normal text-textMuted">bpm</Text></Text>
-            <Text className="text-textMuted text-xs mt-1">✓ Stable</Text>
+          </>
+        ) : (
+          <View className="items-center py-4">
+            <FontAwesome name="heartbeat" size={28} color="#2F333A" />
+            <Text className="text-textMuted mt-2">No vitals recorded yet</Text>
+            <Text className="text-textMuted text-xs mt-1">Tap the edit button to add your readings</Text>
           </View>
-        </View>
-        
-        <View className="h-px bg-borderDark mb-6 w-full" />
-        
-        <View className="flex-row justify-between">
-          <View>
-            <View className="flex-row items-center mb-1">
-              <FontAwesome name="thermometer-half" size={12} color="#94A3B8" />
-              <Text className="text-textMuted text-xs ml-2 uppercase tracking-wide">Temperature</Text>
-            </View>
-            <Text className="text-textLight font-bold text-lg">{vitals.temp} <Text className="text-xs font-normal text-textMuted">°F</Text></Text>
-          </View>
-          <View className="mr-8">
-            <View className="flex-row items-center mb-1">
-              <FontAwesome name="tint" size={12} color="#94A3B8" />
-              <Text className="text-textMuted text-xs ml-2 uppercase tracking-wide">SpO2</Text>
-            </View>
-            <Text className="text-textLight font-bold text-lg">{vitals.spo2} <Text className="text-xs font-normal text-textMuted">%</Text></Text>
-          </View>
-        </View>
+        )}
       </Card>
 
       {/* Vitals Input Modal */}
@@ -158,7 +198,7 @@ export default function DashboardScreen() {
               label="Save Vitals" 
               onPress={handleSaveVitals} 
               className="mt-4" 
-              disabled={!editVitals.bp && !editVitals.hr && !editVitals.temp && !editVitals.spo2}
+              disabled={!editVitals.bp || !editVitals.hr || !editVitals.temp || !editVitals.spo2}
             />
          </KeyboardAvoidingView>
       </Modal>
@@ -208,7 +248,7 @@ export default function DashboardScreen() {
               <FontAwesome name="medkit" size={16} color="#E2E8F0" />
             </View>
             <Text className="text-textLight font-bold">Medications</Text>
-            <Text className="text-textMuted text-xs mt-1">2 Active Scripts</Text>
+            <Text className="text-textMuted text-xs mt-1">{activeScripts} Active Script{activeScripts !== 1 ? 's' : ''}</Text>
          </TouchableOpacity>
 
          <TouchableOpacity 
@@ -219,7 +259,7 @@ export default function DashboardScreen() {
               <FontAwesome name="flask" size={16} color="#E2E8F0" />
             </View>
             <Text className="text-textLight font-bold">Lab Results</Text>
-            <Text className="text-primary text-xs mt-1 font-bold">1 New Update</Text>
+            <Text className="text-textMuted text-xs mt-1">{docCount} Record{docCount !== 1 ? 's' : ''}</Text>
          </TouchableOpacity>
 
          <TouchableOpacity 
@@ -235,12 +275,19 @@ export default function DashboardScreen() {
 
          <TouchableOpacity 
             className="w-[48%] bg-surface rounded-2xl p-4 border border-borderDark"
+            onPress={() => {
+              if (latestApptId) {
+                router.push(`/chat/${latestApptId}` as any);
+              } else {
+                Alert.alert('No Conversations', 'Book an appointment to start messaging your doctor.');
+              }
+            }}
          >
             <View className="w-10 h-10 rounded-full bg-surfaceLight items-center justify-center mb-3">
               <FontAwesome name="comments-o" size={16} color="#E2E8F0" />
             </View>
             <Text className="text-textLight font-bold">Messages</Text>
-            <Text className="text-textMuted text-xs mt-1">0 Unread</Text>
+            <Text className="text-textMuted text-xs mt-1">Open Chat</Text>
          </TouchableOpacity>
       </View>
       

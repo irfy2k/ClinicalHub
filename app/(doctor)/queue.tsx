@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Modal, Image } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Modal, Image, Alert, RefreshControl, ActivityIndicator } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { Services } from '../../services';
@@ -16,6 +16,8 @@ export default function QueueScreen() {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [selectedAppt, setSelectedAppt] = useState<Appointment | null>(null);
   const [patientNames, setPatientNames] = useState<Record<string, string>>({});
+  const [refreshing, setRefreshing] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     loadAppointments();
@@ -23,28 +25,39 @@ export default function QueueScreen() {
 
   const loadAppointments = async () => {
     if (!user) return;
-    const data = await Services.appointment.getByDoctor(user.id);
-    setAppointments(data);
+    try {
+      const data = await Services.appointment.getByDoctor(user.id);
+      setAppointments(data);
 
-    // Fetch patient names for all unique patient IDs
-    const uniquePatientIds = [...new Set(data.map(a => a.patient_id))];
-    const names: Record<string, string> = {};
-    await Promise.all(
-      uniquePatientIds.map(async (pid) => {
-        // Use denormalized name first, fall back to Firebase lookup
-        const apptWithName = data.find(a => a.patient_id === pid && a.patient_name);
-        if (apptWithName?.patient_name) {
-          names[pid] = apptWithName.patient_name;
-        } else {
-          const patient = await Services.auth.getUser(pid);
-          names[pid] = patient?.name || 'Unknown Patient';
-        }
-      })
-    );
-    setPatientNames(names);
+      // Fetch patient names for all unique patient IDs
+      const uniquePatientIds = [...new Set(data.map(a => a.patient_id))];
+      const names: Record<string, string> = {};
+      await Promise.all(
+        uniquePatientIds.map(async (pid) => {
+          const apptWithName = data.find(a => a.patient_id === pid && a.patient_name);
+          if (apptWithName?.patient_name) {
+            names[pid] = apptWithName.patient_name;
+          } else {
+            const patient = await Services.auth.getUser(pid);
+            names[pid] = patient?.name || 'Unknown Patient';
+          }
+        })
+      );
+      setPatientNames(names);
+    } catch (error) {
+      Alert.alert('Error', 'Failed to load appointments. Please try again.');
+    } finally {
+      setIsLoading(false);
+      setRefreshing(false);
+    }
   };
 
-  const handleStatusChange = async (status: Appointment['status']) => {
+  const onRefresh = () => {
+    setRefreshing(true);
+    loadAppointments();
+  };
+
+  const processStatusChange = async (status: Appointment['status']) => {
     if (!selectedAppt) return;
     await Services.appointment.updateStatus(selectedAppt.id, status);
 
@@ -67,6 +80,22 @@ export default function QueueScreen() {
     loadAppointments();
   };
 
+  const handleStatusChange = (status: Appointment['status']) => {
+    if (status === 'completed' || status === 'cancelled') {
+      const actionText = status === 'completed' ? 'Complete Appointment' : 'Cancel Appointment';
+      Alert.alert(
+        actionText,
+        `Are you sure you want to ${status === 'completed' ? 'complete' : 'cancel'} this appointment?`,
+        [
+          { text: 'No', style: 'cancel' },
+          { text: 'Yes', style: status === 'cancelled' ? 'destructive' : 'default', onPress: () => processStatusChange(status) }
+        ]
+      );
+    } else {
+      processStatusChange(status);
+    }
+  };
+
   const upcomingAppts = appointments
     .filter(a => a.status === 'pending' || a.status === 'confirmed')
     .sort((a, b) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime());
@@ -79,7 +108,7 @@ export default function QueueScreen() {
         <View className="flex-row justify-between items-start mb-6">
           <View>
             <Text className="text-textMuted text-sm tracking-wider uppercase mb-1">Clinical Hub</Text>
-            <Text className="text-2xl font-bold text-textLight">Good Morning, {user?.name || 'Doctor'}</Text>
+            <Text className="text-2xl font-bold text-textLight">{new Date().getHours() < 12 ? 'Good Morning' : new Date().getHours() < 17 ? 'Good Afternoon' : 'Good Evening'}, {user?.name || 'Doctor'}</Text>
           </View>
           <TouchableOpacity onPress={logout} className="p-3 bg-surfaceLight border border-borderDark rounded-full">
             <FontAwesome name="sign-out" size={16} color="#E2E8F0" />
@@ -100,8 +129,16 @@ export default function QueueScreen() {
         <Text className="text-textLight font-bold mt-4 mb-2">Your Upcoming Queue</Text>
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: 24, paddingTop: 4 }}>
-        {upcomingAppts.length === 0 ? (
+      <ScrollView 
+        contentContainerStyle={{ padding: 24, paddingTop: 4 }}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#85B523" />}
+      >
+        {isLoading ? (
+          <View className="items-center justify-center py-20">
+            <ActivityIndicator size="large" color="#85B523" />
+            <Text className="text-textMuted mt-4">Loading queue...</Text>
+          </View>
+        ) : upcomingAppts.length === 0 ? (
           <View className="items-center justify-center py-20">
             <FontAwesome name="calendar-check-o" size={48} color="#2F333A" />
             <Text className="text-textMuted mt-4">No upcoming appointments</Text>

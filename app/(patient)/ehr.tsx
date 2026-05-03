@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Alert, Modal, Image } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Alert, Modal, Image, RefreshControl, ActivityIndicator } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { Services } from '../../services';
@@ -29,16 +29,30 @@ export default function MedicalVaultScreen() {
   const [documents, setDocuments] = useState<DocumentRecord[]>([]);
   const [activeFilter, setActiveFilter] = useState<FilterKey>('All Records');
   const [previewDoc, setPreviewDoc] = useState<DocumentRecord | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   const loadDocuments = useCallback(async () => {
     if (!user) return;
-    const docs = await Services.document.getByPatient(user.id);
-    setDocuments(docs);
+    try {
+      const docs = await Services.document.getByPatient(user.id);
+      setDocuments(docs);
+    } catch (error) {
+      Alert.alert('Error', 'Failed to load records. Please try again.');
+    } finally {
+      setIsLoading(false);
+      setRefreshing(false);
+    }
   }, [user]);
 
   useEffect(() => {
     loadDocuments();
   }, [loadDocuments]);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    loadDocuments();
+  };
 
   const filteredDocs = documents.filter(doc => {
     if (activeFilter === 'All Records') return true;
@@ -118,8 +132,16 @@ export default function MedicalVaultScreen() {
         </ScrollView>
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: 24, paddingTop: 8 }}>
-        {filteredDocs.length === 0 ? (
+      <ScrollView 
+        contentContainerStyle={{ padding: 24, paddingTop: 8 }}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#85B523" />}
+      >
+        {isLoading ? (
+          <View className="items-center justify-center py-20">
+            <ActivityIndicator size="large" color="#85B523" />
+            <Text className="text-textMuted mt-4">Loading records...</Text>
+          </View>
+        ) : filteredDocs.length === 0 ? (
           <View className="items-center justify-center py-20">
             <FontAwesome name="folder-open-o" size={48} color="#2F333A" />
             <Text className="text-textMuted mt-4">No records found for this category</Text>

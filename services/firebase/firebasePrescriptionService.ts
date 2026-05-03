@@ -64,6 +64,15 @@ export const firebasePrescriptionService = {
     }
   },
 
+  async updateStatus(id: string, is_active: boolean): Promise<void> {
+    try {
+      const prescRef = ref(database, `prescriptions/${id}/is_active`);
+      await set(prescRef, is_active);
+    } catch (error) {
+      console.error('[Firebase Prescriptions] updateStatus error:', error);
+      throw error;
+    }
+  },
   async logMedication(log: Omit<MedicationLog, 'id'>): Promise<MedicationLog> {
     try {
       // Check for existing log with same prescription_id and logged_at
