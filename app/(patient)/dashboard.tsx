@@ -43,6 +43,7 @@ export default function DashboardScreen() {
 
     // Load next appointment
     const appts = await Services.appointment.getByPatient(user.id);
+    await Services.appointment.checkForMissedAppointments(appts);
     const upcoming = appts
       .filter(a => a.status === 'pending' || a.status === 'confirmed')
       .sort((a, b) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime());

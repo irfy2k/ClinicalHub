@@ -21,7 +21,7 @@ export default function TelemedicineScreen() {
       const appts = await Services.appointment.getByDoctor(user.id);
       const now = Date.now();
       const current = appts.find(a => {
-        if (a.status === 'cancelled' || a.status === 'completed') return false;
+        if (a.status !== 'confirmed') return false;
         
         const apptTime = new Date(a.scheduled_at).getTime();
         // Allow call initiation 15 minutes prior, and up to 30 mins after scheduled block.

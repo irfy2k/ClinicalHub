@@ -163,6 +163,29 @@ export const firebaseAuthService = {
   },
 
   /**
+   * Get all users in the system.
+   * Admin only usage.
+   */
+  async getAllUsers(): Promise<User[]> {
+    if (!auth.currentUser) return [];
+    try {
+      const usersRef = ref(database, 'users');
+      const snapshot = await get(usersRef);
+
+      if (!snapshot.exists()) return [];
+
+      const results: User[] = [];
+      snapshot.forEach((child) => {
+        results.push({ id: child.key!, ...child.val() });
+      });
+      return results;
+    } catch (error) {
+      console.error('[Firebase Auth] getAllUsers error:', error);
+      return [];
+    }
+  },
+
+  /**
    * Update user profile in Realtime Database.
    */
   async updateProfile(uid: string, updates: Partial<User>): Promise<void> {

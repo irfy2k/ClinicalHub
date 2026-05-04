@@ -98,6 +98,8 @@ export default function PatientAppointments() {
     try {
       const data = await Services.appointment.getByPatient(user.id);
       setAppointments(data);
+      // Automatically check for missed appointments
+      await Services.appointment.checkForMissedAppointments(data);
     } catch {
       Alert.alert('Error', 'Failed to load appointments. Please try again.');
     }
@@ -171,7 +173,7 @@ export default function PatientAppointments() {
     const scheduledAt = buildScheduledAtIso(selectedDate, wizardTargetTime);
 
     try {
-      await Services.appointment.createWithSlotLock({
+      const newAppointment = await Services.appointment.createWithSlotLock({
         patient_id: user.id,
         doctor_id: wizardTargetDoctor,
         patient_name: user.name,
@@ -186,7 +188,7 @@ export default function PatientAppointments() {
 
       // Schedule a push notification reminder 30 minutes before the appointment
       await notificationService.scheduleAppointmentReminder(
-        `appt-${Date.now()}`,
+        newAppointment.id,
         wizardDoctorName,
         scheduledAt
       );
@@ -257,17 +259,15 @@ export default function PatientAppointments() {
   };
 
   const filteredAppointments = appointments.filter(appt => {
-    const now = new Date();
-    now.setHours(0, 0, 0, 0);
-    const apptDate = new Date(appt.scheduled_at);
-    const isBeforeToday = apptDate < now;
-    
+    const nowMs = Date.now();
+    const apptMs = new Date(appt.scheduled_at).getTime();
+    const isPast = apptMs < nowMs;
     const isActive = appt.status === 'pending' || appt.status === 'confirmed';
 
     if (filter === 'Upcoming') {
-      return isActive && !isBeforeToday;
+      return isActive && !isPast;
     }
-    return !isActive || isBeforeToday;
+    return !isActive || isPast;
   });
 
   const filteredDoctors = doctors.filter(doc => 
@@ -320,7 +320,10 @@ export default function PatientAppointments() {
               <Card key={appt.id} className="mb-4">
                 <View className="flex-row justify-between items-start mb-3">
                   <View>
-                    <Text className="text-primary text-xs font-bold uppercase tracking-wider mb-1">{appt.status}</Text>
+                    <Text className={clsx(
+                      "text-xs font-bold uppercase tracking-wider mb-1",
+                      appt.status === 'missed' ? "text-red-400" : "text-primary"
+                    )}>{appt.status}</Text>
                     <Text className="text-textLight font-bold text-lg">{appt.doctor_name || 'Doctor'}</Text>
                     <Text className="text-textMuted text-sm">{specialty}</Text>
                   </View>

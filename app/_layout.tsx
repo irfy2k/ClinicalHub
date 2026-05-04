@@ -56,6 +56,7 @@ export default function RootLayout() {
           <Stack.Screen name="(auth)" />
           <Stack.Screen name="(patient)" />
           <Stack.Screen name="(doctor)" />
+          <Stack.Screen name="(admin)" />
           <Stack.Screen name="chat/[id]" />
         </Stack>
       </SafeAreaProvider>

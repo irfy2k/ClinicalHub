@@ -22,6 +22,8 @@ export default function MedicationsScreen() {
   const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
   const [logs, setLogs] = useState<MedicationLog[]>([]);
   const [timeline, setTimeline] = useState<TimelineEntry[]>([]);
+  const [doctorNames, setDoctorNames] = useState<Record<string, string>>({});
+  const [prescriptionDoctorMap, setPrescriptionDoctorMap] = useState<Record<string, string>>({});
   const [remindersEnabled, setRemindersEnabled] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -31,6 +33,23 @@ export default function MedicationsScreen() {
     try {
       const prescData = await Services.prescription.getByPatient(user.id);
       setPrescriptions(prescData);
+
+      const uniqueDoctorIds = [...new Set(prescData.map(p => p.doctor_id).filter(Boolean))];
+      if (uniqueDoctorIds.length) {
+        const entries = await Promise.all(
+          uniqueDoctorIds.map(async (id) => {
+            const profile = await Services.auth.getUser(id);
+            return [id, profile?.name || 'Doctor'] as const;
+          })
+        );
+        const doctorMap = Object.fromEntries(entries);
+        setDoctorNames(doctorMap);
+        const prescriberMap: Record<string, string> = {};
+        prescData.forEach((p) => {
+          prescriberMap[p.id] = doctorMap[p.doctor_id] || 'Doctor';
+        });
+        setPrescriptionDoctorMap(prescriberMap);
+      }
 
       // Load all logs for active prescriptions
       const allLogs: MedicationLog[] = [];
@@ -245,6 +264,9 @@ export default function MedicationsScreen() {
                   <Text className="text-textLight font-bold text-lg">
                     {entry.medicationName}{' '}
                     <Text className="text-textMuted font-normal text-sm">{entry.dosage}</Text>
+                  </Text>
+                  <Text className="text-textMuted text-xs mt-1">
+                    Prescribed by {prescriptionDoctorMap[entry.prescriptionId] || 'Doctor'}
                   </Text>
                   <Text className={clsx(
                     "text-sm mt-1 font-semibold",

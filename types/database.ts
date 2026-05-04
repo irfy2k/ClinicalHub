@@ -4,7 +4,7 @@
  * Collections: users, appointments, prescriptions, medication_logs, health_expenses, documents, chat_messages
  */
 
-export type UserRole = 'patient' | 'doctor';
+export type UserRole = 'patient' | 'doctor' | 'admin';
 
 export interface User {
   id: string;
@@ -19,7 +19,7 @@ export interface User {
   created_at: string;
 }
 
-export type AppointmentStatus = 'pending' | 'confirmed' | 'completed' | 'cancelled';
+export type AppointmentStatus = 'pending' | 'confirmed' | 'completed' | 'cancelled' | 'missed';
 
 export interface Appointment {
   id: string;
@@ -74,6 +74,7 @@ export interface HealthExpense {
   description?: string;
   date_incurred: string;
   related_appointment_id?: string;
+  related_prescription_id?: string;
   created_at: string;
 }
 

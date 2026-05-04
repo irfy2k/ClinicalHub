@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Modal, Alert, RefreshControl, ActivityIndicator } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { FontAwesome } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { Services } from '../../services';
@@ -113,7 +114,12 @@ export default function FinancesScreen() {
     if (!user) return;
     try {
       const data = await Services.finance.getByPatient(user.id);
-      setExpenses(data);
+      const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
+      const filtered = data.filter((expense) => {
+        if (expense.expense_type === 'medication') return true;
+        return new Date(expense.date_incurred).getTime() >= cutoff;
+      });
+      setExpenses(filtered);
     } catch {
       Alert.alert('Error', 'Failed to load finances. Please try again.');
     } finally {
@@ -122,9 +128,11 @@ export default function FinancesScreen() {
     }
   }, [user]);
 
-  useEffect(() => {
-    loadExpenses();
-  }, [loadExpenses]);
+  useFocusEffect(
+    useCallback(() => {
+      loadExpenses();
+    }, [loadExpenses])
+  );
 
   const onRefresh = () => {
     setRefreshing(true);

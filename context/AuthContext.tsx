@@ -41,17 +41,24 @@ function useProtectedRoute(user: User | null, isLoading: boolean) {
       // Redirect away from the sign-in page.
       if (user.role === 'patient') {
         router.replace('/(patient)/dashboard');
-      } else {
+      } else if (user.role === 'doctor') {
         router.replace('/(doctor)/queue');
+      } else if (user.role === 'admin') {
+        router.replace('/(admin)/dashboard');
       }
     } else if (user && !inAuthGroup) {
-      // Prevent patient users from accessing provider routes and vice versa
-      const attemptedRoleGroup = segments[0] === '(patient)' ? 'patient' : segments[0] === '(doctor)' ? 'doctor' : null;
+      // Prevent users from accessing routes not meant for their role
+      const attemptedRoleGroup = segments[0] === '(patient)' ? 'patient' : 
+                               segments[0] === '(doctor)' ? 'doctor' : 
+                               segments[0] === '(admin)' ? 'admin' : null;
+                               
       if (attemptedRoleGroup && attemptedRoleGroup !== user.role) {
          if (user.role === 'patient') {
            router.replace('/(patient)/dashboard');
-         } else {
+         } else if (user.role === 'doctor') {
            router.replace('/(doctor)/queue');
+         } else if (user.role === 'admin') {
+           router.replace('/(admin)/dashboard');
          }
       }
     }

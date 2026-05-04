@@ -25,6 +25,8 @@ export default function QueueScreen() {
     try {
       const data = await Services.appointment.getByDoctor(user.id);
       setAppointments(data);
+      // Automatically check for missed appointments
+      await Services.appointment.checkForMissedAppointments(data);
 
       // Fetch patient names for all unique patient IDs
       const uniquePatientIds = [...new Set(data.map(a => a.patient_id))];
@@ -170,7 +172,7 @@ export default function QueueScreen() {
                   <FontAwesome 
                     name={appt.status === 'completed' ? 'check-circle' : appt.status === 'pending' ? 'clock-o' : 'calendar-check-o'} 
                     size={20} 
-                    color={appt.status === 'completed' ? '#85B523' : appt.status === 'pending' ? '#E2E8F0' : '#2C3E50'} 
+                    color={appt.status === 'completed' ? '#85B523' : appt.status === 'pending' ? '#E2E8F0' : appt.status === 'missed' ? '#F87171' : '#2C3E50'} 
                   />
                 </View>
               </Card>

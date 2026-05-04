@@ -109,16 +109,6 @@ export default function DoctorPrescriptions() {
       is_active: true,
     });
 
-    if (costEstimate && parseFloat(costEstimate) > 0) {
-      await Services.finance.create({
-        patient_id: selectedPatientId,
-        expense_type: 'medication',
-        amount: parseFloat(costEstimate),
-        description: `Prescription: ${medName} (${dosage}) - Prescribed by ${user.name}`,
-        date_incurred: new Date().toISOString()
-      });
-    }
-
     await notificationService.scheduleMedicationReminders(newPrescription);
     await notificationService.sendInstantNotification(
       '💊 New Prescription Issued',
@@ -127,7 +117,7 @@ export default function DoctorPrescriptions() {
 
     resetForm();
     setIsCreating(false);
-    loadData();
+    await loadData();
     Alert.alert('Success', 'Prescription created and reminders scheduled.');
   };
 

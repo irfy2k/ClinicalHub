@@ -21,6 +21,23 @@ export class SlotAlreadyBookedError extends Error {
  * Handles CRUD operations for appointments via Firebase Realtime Database.
  */
 export const firebaseAppointmentService = {
+  async getAll(): Promise<Appointment[]> {
+    try {
+      const appointmentsRef = ref(database, 'appointments');
+      const snapshot = await get(appointmentsRef);
+
+      if (!snapshot.exists()) return [];
+
+      const results: Appointment[] = [];
+      snapshot.forEach((child) => {
+        results.push({ id: child.key!, ...child.val() });
+      });
+      return results;
+    } catch (error) {
+      console.error('[Firebase Appointments] getAll error:', error);
+      return [];
+    }
+  },
   async getByPatient(patientId: string): Promise<Appointment[]> {
     try {
       const appointmentsRef = ref(database, 'appointments');
@@ -89,6 +106,7 @@ export const firebaseAppointmentService = {
       if (currentValue) return;
       return {
         appointment_id: appointmentId,
+        patient_id: appointment.patient_id,
         doctor_id: appointment.doctor_id,
         scheduled_at: appointment.scheduled_at,
         status: appointment.status,
@@ -145,6 +163,25 @@ export const firebaseAppointmentService = {
       throw error;
     }
   },
+  async deleteAppointment(id: string): Promise<void> {
+    try {
+      const apptRef = ref(database, `appointments/${id}`);
+      const snapshot = await get(apptRef);
+      if (!snapshot.exists()) return;
+
+      const appointment = snapshot.val() as Omit<Appointment, 'id'>;
+      await remove(apptRef);
+
+      const wasActive = ACTIVE_APPOINTMENT_STATUSES.includes(appointment.status);
+      if (wasActive) {
+        const slotKey = buildSlotKey(appointment.doctor_id, appointment.scheduled_at);
+        await remove(ref(database, `appointment_slots/${slotKey}`));
+      }
+    } catch (error) {
+      console.error('[Firebase Appointments] deleteAppointment error:', error);
+      throw error;
+    }
+  },
   async getById(id: string): Promise<Appointment | null> {
     try {
       const apptRef = ref(database, `appointments/${id}`);
@@ -163,6 +200,28 @@ export const firebaseAppointmentService = {
       await update(apptRef, { [field]: 0 });
     } catch (error) {
       console.error('[Firebase Appointments] markAsRead error:', error);
+    }
+  },
+  async checkForMissedAppointments(appointments: Appointment[]): Promise<void> {
+    const nowMs = Date.now();
+    for (const appt of appointments) {
+      const scheduledMs = new Date(appt.scheduled_at).getTime();
+      if (
+        (appt.status === 'pending' || appt.status === 'confirmed') &&
+        scheduledMs <= nowMs
+      ) {
+        try {
+          await this.updateStatus(appt.id, 'missed');
+          // Send notification
+          const { notificationService } = require('../notificationService');
+          await notificationService.sendInstantNotification(
+            'Missed Appointment',
+            `You missed your appointment with ${appt.doctor_name || 'your doctor'}.`
+          );
+        } catch (error) {
+          console.error('[Firebase Appointments] Error updating missed appointment:', error);
+        }
+      }
     }
   },
 };

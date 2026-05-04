@@ -1,0 +1,73 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "users": {
+      ".read": "auth != null",
+      ".indexOn": ["role"],
+      "$uid": {
+        ".read": "auth != null",
+        ".write": "auth != null && (auth.uid == $uid || root.child('users').child(auth.uid).child('role').val() == 'admin')"
+      }
+    },
+    "appointments": {
+      ".read": "auth != null",
+      ".indexOn": ["patient_id", "doctor_id", "scheduled_at"],
+      "$id": {
+        ".read": "auth != null && (root.child('users').child(auth.uid).child('role').val() == 'admin' || data.child('patient_id').val() == auth.uid || data.child('doctor_id').val() == auth.uid)",
+        ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() == 'admin' || (!data.exists() && (newData.child('patient_id').val() == auth.uid || newData.child('doctor_id').val() == auth.uid)) || (data.exists() && (data.child('patient_id').val() == auth.uid || data.child('doctor_id').val() == auth.uid)))"
+      }
+    },
+    "appointment_slots": {
+      ".read": "auth != null",
+      "$slot_key": {
+        ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() == 'admin' || (newData.exists() && (newData.child('doctor_id').val() == auth.uid || newData.child('patient_id').val() == auth.uid)) || (data.exists() && (data.child('doctor_id').val() == auth.uid || data.child('patient_id').val() == auth.uid)))"
+      }
+    },
+    "prescriptions": {
+      ".read": "auth != null",
+      ".indexOn": ["patient_id", "doctor_id"],
+      "$id": {
+        ".read": "auth != null && (root.child('users').child(auth.uid).child('role').val() == 'admin' || data.child('patient_id').val() == auth.uid || data.child('doctor_id').val() == auth.uid)",
+        ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() == 'admin' || (!data.exists() && newData.child('doctor_id').val() == auth.uid) || (data.exists() && (data.child('patient_id').val() == auth.uid || data.child('doctor_id').val() == auth.uid)))"
+      }
+    },
+    "medication_logs": {
+      ".read": "auth != null",
+      ".indexOn": ["prescription_id"],
+      "$id": {
+        ".read": "auth != null && (root.child('users').child(auth.uid).child('role').val() == 'admin' || root.child('prescriptions').child(data.child('prescription_id').val()).child('patient_id').val() == auth.uid || root.child('prescriptions').child(data.child('prescription_id').val()).child('doctor_id').val() == auth.uid)",
+        ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() == 'admin' || root.child('prescriptions').child(newData.child('prescription_id').val()).child('patient_id').val() == auth.uid || root.child('prescriptions').child(newData.child('prescription_id').val()).child('doctor_id').val() == auth.uid)"
+      }
+    },
+    "health_expenses": {
+      ".read": "auth != null",
+      ".indexOn": ["patient_id", "related_prescription_id"],
+      "$id": {
+        ".read": "auth != null && (root.child('users').child(auth.uid).child('role').val() == 'admin' || data.child('patient_id').val() == auth.uid)",
+        ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() == 'admin' || (!data.exists() && (newData.child('patient_id').val() == auth.uid || (newData.child('related_prescription_id').val() != null && root.child('prescriptions').child(newData.child('related_prescription_id').val()).child('doctor_id').val() == auth.uid))) || (data.exists() && (data.child('patient_id').val() == auth.uid || (data.child('related_prescription_id').val() != null && root.child('prescriptions').child(data.child('related_prescription_id').val()).child('doctor_id').val() == auth.uid))))"
+      }
+    },
+    "documents": {
+      ".read": "auth != null",
+      ".indexOn": ["patient_id"],
+      "$id": {
+        ".read": "auth != null && (root.child('users').child(auth.uid).child('role').val() == 'admin' || data.child('patient_id').val() == auth.uid || data.child('uploaded_by').val() == auth.uid)",
+        ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() == 'admin' || (!data.exists() && newData.child('uploaded_by').val() == auth.uid && (newData.child('patient_id').val() == auth.uid || root.child('users').child(auth.uid).child('role').val() == 'doctor')) || (data.exists() && (data.child('patient_id').val() == auth.uid || data.child('uploaded_by').val() == auth.uid)))"
+      }
+    },
+    "chat_messages": {
+      ".read": "auth != null",
+      ".indexOn": ["appointment_id"],
+      "$id": {
+        ".read": "auth != null && (root.child('users').child(auth.uid).child('role').val() == 'admin' || root.child('appointments').child(data.child('appointment_id').val()).child('patient_id').val() == auth.uid || root.child('appointments').child(data.child('appointment_id').val()).child('doctor_id').val() == auth.uid)",
+        ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() == 'admin' || root.child('appointments').child(newData.child('appointment_id').val()).child('patient_id').val() == auth.uid || root.child('appointments').child(newData.child('appointment_id').val()).child('doctor_id').val() == auth.uid)"
+      }
+    },
+    "admin_audit_logs": {
+      ".read": "auth != null && root.child('users').child(auth.uid).child('role').val() == 'admin'",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() == 'admin'",
+      ".indexOn": ["created_at"]
+    }
+  }
+}
