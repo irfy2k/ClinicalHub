@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Modal, Alert } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { FontAwesome } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { Services } from '../../services';
@@ -59,6 +60,17 @@ export default function PatientAppointments() {
     return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
   };
 
+  const isPastSlotForDate = (dateStr: string, slot: string) => {
+    const todayKey = toPakistanDateKey(getPakistanNow());
+    if (dateStr !== todayKey) return false;
+    const now = getPakistanNow();
+    const [h, m] = normalizeSlot(slot).split(':').map(Number);
+    if (Number.isNaN(h) || Number.isNaN(m)) return false;
+    const slotMinutes = h * 60 + m;
+    const nowMinutes = now.getUTCHours() * 60 + now.getUTCMinutes();
+    return slotMinutes <= nowMinutes;
+  };
+
   const markSlotBookedLocally = (doctorId: string, slot: string) => {
     const normalized = normalizeSlot(slot);
     setBookedSlotsByDoctor((prev) => {
@@ -93,22 +105,20 @@ export default function PatientAppointments() {
     return toPakistanDateKey(pkt);
   });
 
-  const loadAppointments = useCallback(async () => {
-    if (!user) return;
-    try {
-      const data = await Services.appointment.getByPatient(user.id);
-      setAppointments(data);
-      // Automatically check for missed appointments
-      await Services.appointment.checkForMissedAppointments(data);
-    } catch {
-      Alert.alert('Error', 'Failed to load appointments. Please try again.');
-    }
+  useEffect(() => {
+    loadDoctors();
   }, [user]);
 
-  useEffect(() => {
-    loadAppointments();
-    loadDoctors();
-  }, [loadAppointments, user]);
+  useFocusEffect(
+    useCallback(() => {
+      if (!user) return;
+      const unsubscribe = Services.appointment.onByPatient(user.id, async (data) => {
+        setAppointments(data);
+        await Services.appointment.checkForMissedAppointments(data, user?.id);
+      });
+      return unsubscribe;
+    }, [user])
+  );
 
   const loadBookedSlots = useCallback(async () => {
     if (!doctors.length) {
@@ -129,20 +139,18 @@ export default function PatientAppointments() {
     };
 
     const slotMap: Record<string, Set<string>> = {};
-    await Promise.all(
-      doctors.map(async (doc) => {
-        const docAppointments = await Services.appointment.getByDoctor(doc.id);
-        const occupied = docAppointments
-          .filter(
-            (appt) =>
-              (appt.status === 'pending' || appt.status === 'confirmed') &&
-              toPakistanDateFromIso(appt.scheduled_at) === selectedDate
-          )
-          .map((appt) => toPakistanSlotTime(appt.scheduled_at));
-
-        slotMap[doc.id] = new Set(occupied);
-      })
-    );
+    const allAppointments = await Services.appointment.getAll();
+    doctors.forEach((doc) => {
+      const occupied = allAppointments
+        .filter(
+          (appt) =>
+            appt.doctor_id === doc.id &&
+            (appt.status === 'pending' || appt.status === 'confirmed') &&
+            toPakistanDateFromIso(appt.scheduled_at) === selectedDate
+        )
+        .map((appt) => toPakistanSlotTime(appt.scheduled_at));
+      slotMap[doc.id] = new Set(occupied);
+    });
     setBookedSlotsByDoctor(slotMap);
   }, [doctors, selectedDate, PKT_OFFSET_MINUTES]);
 
@@ -196,14 +204,15 @@ export default function PatientAppointments() {
       // Confirm booking with an instant notification
       await notificationService.sendInstantNotification(
         '📅 Appointment Booked',
-        `Your appointment with ${wizardDoctorName} for ${wizardTargetTime} has been confirmed. You'll be reminded 30 minutes before.`
+        `Your appointment with ${wizardDoctorName} for ${wizardTargetTime} has been confirmed. You'll be reminded 30 minutes before.`,
+        undefined,
+        user.id
       );
 
       setWizardTargetDoctor(null);
       setWizardTargetTime(null);
       setWizardDoctorName('');
       setIsBooking(false);
-      loadAppointments();
       loadBookedSlots();
     } catch (e) {
       if (e instanceof SlotAlreadyBookedError) {
@@ -227,7 +236,6 @@ export default function PatientAppointments() {
           onPress: async () => {
             try {
               await Services.appointment.updateStatus(apptId, 'cancelled');
-              loadAppointments();
             } catch {
               Alert.alert('Error', 'Failed to cancel appointment.');
             }
@@ -250,7 +258,6 @@ export default function PatientAppointments() {
       try {
         const photoData = `data:image/jpeg;base64,${result.assets[0].base64}`;
         await Services.appointment.updateAppointment(id, { photo_data: photoData });
-        loadAppointments();
         Alert.alert('Success', 'Photo attached to your appointment record.');
       } catch {
         Alert.alert('Error', 'Failed to upload photo.');
@@ -441,19 +448,21 @@ export default function PatientAppointments() {
                        {(doc.available_times || ['09:00', '10:00', '14:00', '15:00']).map(slot => {
                           const normalizedSlot = normalizeSlot(slot);
                           const isBooked = bookedSlotsByDoctor[doc.id]?.has(normalizedSlot) ?? false;
+                          const isPastSlot = isPastSlotForDate(selectedDate, normalizedSlot);
+                          const isUnavailable = isBooked || isPastSlot;
                           return (
                           <TouchableOpacity 
                             key={slot} 
                             className={clsx(
                               "rounded px-3 py-2 border",
-                              isBooked
+                              isUnavailable
                                 ? "bg-surface border-borderDark"
                                 : "bg-primary/20 border-primary"
                             )}
                             onPress={() => handleBook(doc.id, doc.name, slot)}
-                            disabled={isBooked}
+                            disabled={isUnavailable}
                           >
-                             <Text className={clsx("font-bold", isBooked ? "text-textMuted" : "text-primary")}>
+                             <Text className={clsx("font-bold", isUnavailable ? "text-textMuted" : "text-primary")}>
                                {slot}
                              </Text>
                           </TouchableOpacity>

@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Alert, Switch, RefreshControl, ActivityIndicator } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { FontAwesome } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { Services } from '../../services';
@@ -28,10 +29,8 @@ export default function MedicationsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  const loadData = useCallback(async () => {
-    if (!user) return;
+  const loadData = useCallback(async (prescData: Prescription[]) => {
     try {
-      const prescData = await Services.prescription.getByPatient(user.id);
       setPrescriptions(prescData);
 
       const uniqueDoctorIds = [...new Set(prescData.map(p => p.doctor_id).filter(Boolean))];
@@ -51,43 +50,38 @@ export default function MedicationsScreen() {
         setPrescriptionDoctorMap(prescriberMap);
       }
 
-      // Load all logs for active prescriptions
-      const allLogs: MedicationLog[] = [];
-      for (const p of prescData.filter(p => p.is_active)) {
-        const prescLogs = await Services.prescription.getLogsByPrescription(p.id);
-        allLogs.push(...prescLogs);
-      }
+      const activePrescriptions = prescData.filter(p => p.is_active);
+      const logsByPrescription = await Promise.all(
+        activePrescriptions.map((p) => Services.prescription.getLogsByPrescription(p.id))
+      );
+      const allLogs = logsByPrescription.flat();
       setLogs(allLogs);
 
-      // Build today's timeline from active prescriptions
-    const todayEntries: TimelineEntry[] = [];
-    const today = new Date().toISOString().split('T')[0];
+      const todayEntries: TimelineEntry[] = [];
+      const today = new Date().toISOString().split('T')[0];
 
-    for (const p of prescData.filter(p => p.is_active)) {
-      for (const time of p.schedule_times) {
-        // Check if there's a log for this specific slot today
-        const existingLog = allLogs.find(l =>
-          l.prescription_id === p.id &&
-          l.logged_at.startsWith(today) &&
-          l.logged_at.includes(time)
-        );
+      for (const p of activePrescriptions) {
+        for (const time of p.schedule_times) {
+          const existingLog = allLogs.find(l =>
+            l.prescription_id === p.id &&
+            l.logged_at.startsWith(today) &&
+            l.logged_at.includes(time)
+          );
 
-        todayEntries.push({
-          prescriptionId: p.id,
-          medicationName: p.medication_name,
-          dosage: p.dosage,
-          scheduledTime: time,
-          status: existingLog?.status || 'pending',
-          logId: existingLog?.id,
-        });
+          todayEntries.push({
+            prescriptionId: p.id,
+            medicationName: p.medication_name,
+            dosage: p.dosage,
+            scheduledTime: time,
+            status: existingLog?.status || 'pending',
+            logId: existingLog?.id,
+          });
+        }
       }
-    }
 
-    // Sort by time
-    todayEntries.sort((a, b) => a.scheduledTime.localeCompare(b.scheduledTime));
-    setTimeline(todayEntries);
+      todayEntries.sort((a, b) => a.scheduledTime.localeCompare(b.scheduledTime));
+      setTimeline(todayEntries);
 
-    // Schedule medication reminders if enabled
       if (remindersEnabled) {
         await notificationService.scheduleAllMedicationReminders(prescData);
       }
@@ -97,15 +91,20 @@ export default function MedicationsScreen() {
       setIsLoading(false);
       setRefreshing(false);
     }
-  }, [user, remindersEnabled]);
+  }, [remindersEnabled]);
 
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
+  useFocusEffect(
+    useCallback(() => {
+      if (!user) return;
+      setIsLoading(true);
+      const unsubscribe = Services.prescription.onByPatient(user.id, loadData);
+      return unsubscribe;
+    }, [user, loadData])
+  );
 
   const onRefresh = () => {
     setRefreshing(true);
-    loadData();
+    loadData(prescriptions);
   };
 
   const handleToggle = async (entry: TimelineEntry) => {
@@ -136,12 +135,14 @@ export default function MedicationsScreen() {
     if (newStatus === 'taken') {
       await notificationService.sendInstantNotification(
         '✅ Medication Logged',
-        `${entry.medicationName} (${entry.dosage}) marked as taken.`
+        `${entry.medicationName} (${entry.dosage}) marked as taken.`,
+        undefined,
+        user?.id
       );
     }
 
     // Refresh data
-    loadData();
+    await loadData(prescriptions);
   };
 
   const handleToggleReminders = async (enabled: boolean) => {

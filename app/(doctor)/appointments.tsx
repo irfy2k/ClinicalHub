@@ -18,28 +18,22 @@ export default function DoctorAppointments() {
   const [previewPhoto, setPreviewPhoto] = useState<string | null>(null);
   const router = useRouter();
 
-  const loadAppointments = useCallback(async () => {
-    if (!user) return;
-    try {
-      const data = await Services.appointment.getByDoctor(user.id);
-      setAppointments(data);
-    } catch {
-      Alert.alert('Error', 'Failed to load appointments.');
-    } finally {
-      setIsLoading(false);
-      setRefreshing(false);
-    }
-  }, [user]);
-
   useFocusEffect(
     useCallback(() => {
-      loadAppointments();
-    }, [loadAppointments])
+      if (!user) return;
+      setIsLoading(true);
+      const unsubscribe = Services.appointment.onByDoctor(user.id, (data) => {
+        setAppointments(data);
+        setIsLoading(false);
+        setRefreshing(false);
+      });
+      return unsubscribe;
+    }, [user])
   );
 
   const onRefresh = () => {
     setRefreshing(true);
-    loadAppointments();
+    setRefreshing(false);
   };
 
   const filteredAppointments = appointments.filter(appt => {

@@ -24,6 +24,11 @@ export interface ScheduledReminder {
 
 class NotificationService {
   private scheduledReminders: ScheduledReminder[] = [];
+  private currentUserId: string | null = null;
+
+  setCurrentUserId(userId: string | null) {
+    this.currentUserId = userId;
+  }
 
   /**
    * Request notification permissions from the user.
@@ -197,7 +202,13 @@ class NotificationService {
   /**
    * Send an immediate local notification (used for status updates, confirmations, etc.)
    */
-  async sendInstantNotification(title: string, body: string, data?: Record<string, any>): Promise<void> {
+  async sendInstantNotification(
+    title: string,
+    body: string,
+    data?: Record<string, any>,
+    targetUserId?: string
+  ): Promise<void> {
+    if (targetUserId && this.currentUserId && targetUserId !== this.currentUserId) return;
     if (Platform.OS === 'web') return;
     await Notifications.scheduleNotificationAsync({
       content: {

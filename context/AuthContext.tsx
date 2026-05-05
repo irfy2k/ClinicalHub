@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useRouter, useSegments } from 'expo-router';
 import { User } from '../types/database';
 import { Services } from '../services';
+import { notificationService } from '../services/notificationService';
 import { firebaseAuthService } from '../services/firebase/firebaseAuthService';
 
 interface AuthContextType {
@@ -70,6 +71,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   // Restore session from Firebase Auth on app launch
+  useEffect(() => {
+    notificationService.setCurrentUserId(user?.id || null);
+  }, [user]);
+
   useEffect(() => {
     const unsubscribe = firebaseAuthService.onAuthStateChanged(async (firebaseUser) => {
       if (firebaseUser) {

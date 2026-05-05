@@ -4,14 +4,13 @@ import { useFocusEffect } from '@react-navigation/native';
 import { FontAwesome } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { Services } from '../../services';
-import { HealthExpense, ExpenseType } from '../../types/database';
+import { HealthExpense, ExpenseType, Prescription } from '../../types/database';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import Svg, { Path, Circle } from 'react-native-svg';
 import { clsx } from 'clsx';
 
-// Expense type config
 const EXPENSE_CONFIG: Record<ExpenseType, { label: string; color: string; icon: string }> = {
   consultation: { label: 'Consultations', color: '#85B523', icon: 'stethoscope' },
   medication: { label: 'Medications', color: '#3B82F6', icon: 'medkit' },
@@ -21,7 +20,6 @@ const EXPENSE_CONFIG: Record<ExpenseType, { label: string; color: string; icon: 
 
 type FilterKey = 'All' | ExpenseType;
 
-// Simple pie chart component using react-native-svg
 function PieChart({ expenses, size = 180 }: { expenses: HealthExpense[], size?: number }) {
   const aggregated = (['consultation', 'medication', 'lab', 'other'] as ExpenseType[]).map(type => ({
     type,
@@ -46,7 +44,7 @@ function PieChart({ expenses, size = 180 }: { expenses: HealthExpense[], size?: 
   const center = size / 2;
   const innerRadius = size * 0.25;
 
-  let currentAngle = -Math.PI / 2; // Start from top
+  let currentAngle = -Math.PI / 2;
 
   const slices = aggregated.filter(d => d.amount > 0).map(d => {
     const sliceAngle = (d.amount / total) * 2 * Math.PI;
@@ -101,46 +99,60 @@ export default function FinancesScreen() {
   const { user } = useAuth();
   const [expenses, setExpenses] = useState<HealthExpense[]>([]);
   const [activeFilter, setActiveFilter] = useState<FilterKey>('All');
+  const [rangeFilter, setRangeFilter] = useState<'7d' | '30d' | 'all'>('7d');
   const [isAdding, setIsAdding] = useState(false);
+  const [activeMedicationIds, setActiveMedicationIds] = useState<string[]>([]);
 
-  // Add Expense form state
   const [newType, setNewType] = useState<ExpenseType>('consultation');
   const [newAmount, setNewAmount] = useState('');
   const [newDescription, setNewDescription] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  const loadExpenses = useCallback(async () => {
-    if (!user) return;
-    try {
-      const data = await Services.finance.getByPatient(user.id);
-      const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
-      const filtered = data.filter((expense) => {
-        if (expense.expense_type === 'medication') return true;
-        return new Date(expense.date_incurred).getTime() >= cutoff;
-      });
-      setExpenses(filtered);
-    } catch {
-      Alert.alert('Error', 'Failed to load finances. Please try again.');
-    } finally {
-      setIsLoading(false);
-      setRefreshing(false);
-    }
-  }, [user]);
+  const syncPrescriptions = useCallback((prescriptions: Prescription[]) => {
+    setActiveMedicationIds(prescriptions.filter((p) => p.is_active).map((p) => p.id));
+  }, []);
+
+  const syncExpenses = useCallback((data: HealthExpense[]) => {
+    setExpenses(data);
+    setIsLoading(false);
+    setRefreshing(false);
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
-      loadExpenses();
-    }, [loadExpenses])
+      if (!user) return;
+      setIsLoading(true);
+      const unsubPrescriptions = Services.prescription.onByPatient(user.id, syncPrescriptions);
+      const unsubExpenses = Services.finance.onByPatient(user.id, syncExpenses);
+
+      return () => {
+        unsubPrescriptions();
+        unsubExpenses();
+      };
+    }, [user, syncPrescriptions, syncExpenses])
   );
 
   const onRefresh = () => {
     setRefreshing(true);
-    loadExpenses();
+    setRefreshing(false);
+  };
+
+  const isWithinRange = (dateStr: string) => {
+    if (rangeFilter === 'all') return true;
+    const now = Date.now();
+    const rangeMs = rangeFilter === '30d' ? 30 * 24 * 60 * 60 * 1000 : 7 * 24 * 60 * 60 * 1000;
+    return new Date(dateStr).getTime() >= now - rangeMs;
   };
 
   const filteredExpenses = expenses
     .filter(e => activeFilter === 'All' || e.expense_type === activeFilter)
+    .filter((expense) => {
+      if (expense.expense_type === 'medication') {
+        return !!expense.related_prescription_id && activeMedicationIds.includes(expense.related_prescription_id);
+      }
+      return isWithinRange(expense.date_incurred);
+    })
     .sort((a, b) => new Date(b.date_incurred).getTime() - new Date(a.date_incurred).getTime());
 
   const handleAddExpense = async () => {
@@ -162,7 +174,6 @@ export default function FinancesScreen() {
       setNewDescription('');
       setNewType('consultation');
       setIsAdding(false);
-      loadExpenses();
       Alert.alert('Success', 'Expense recorded successfully.');
     } catch {
       Alert.alert('Error', 'Failed to save expense.');
@@ -195,12 +206,12 @@ export default function FinancesScreen() {
         <Text className="text-textMuted text-sm mb-4">Track your healthcare spending by category.</Text>
       </View>
 
-      <ScrollView 
+      <ScrollView
         contentContainerStyle={{ padding: 24, paddingTop: 8 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#85B523" />}
       >
         <Text className="text-textLight font-bold mb-4">Financial Overview</Text>
-        
+
         {isLoading ? (
           <View className="items-center justify-center py-20">
             <ActivityIndicator size="large" color="#85B523" />
@@ -208,7 +219,7 @@ export default function FinancesScreen() {
           </View>
         ) : (
           <Card className="mb-6 items-center py-6">
-            <PieChart expenses={expenses} size={180} />
+            <PieChart expenses={filteredExpenses} size={180} />
             <View className="flex-row flex-wrap justify-center mt-6 gap-x-4 gap-y-2">
               {(['consultation', 'medication', 'lab', 'other'] as ExpenseType[]).map(type => (
                 <View key={type} className="flex-row items-center">
@@ -227,7 +238,45 @@ export default function FinancesScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Filters */}
+        <View className="mb-4">
+          <Text className="text-textMuted text-xs uppercase tracking-wider font-bold mb-2">Time Range</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <TouchableOpacity
+              className={clsx(
+                "px-4 py-2 rounded-full mr-2 border",
+                rangeFilter === '7d' ? "bg-primary border-primary" : "bg-surfaceLight border-borderDark"
+              )}
+              onPress={() => setRangeFilter('7d')}
+            >
+              <Text className={clsx("font-bold", rangeFilter === '7d' ? "text-background" : "text-textLight")}>
+                7 Days
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              className={clsx(
+                "px-4 py-2 rounded-full mr-2 border",
+                rangeFilter === '30d' ? "bg-primary border-primary" : "bg-surfaceLight border-borderDark"
+              )}
+              onPress={() => setRangeFilter('30d')}
+            >
+              <Text className={clsx("font-bold", rangeFilter === '30d' ? "text-background" : "text-textLight")}>
+                Month
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              className={clsx(
+                "px-4 py-2 rounded-full mr-2 border",
+                rangeFilter === 'all' ? "bg-primary border-primary" : "bg-surfaceLight border-borderDark"
+              )}
+              onPress={() => setRangeFilter('all')}
+            >
+              <Text className={clsx("font-bold", rangeFilter === 'all' ? "text-background" : "text-textLight")}>
+                All Time
+              </Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </View>
+
         <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-6">
           <FilterButton label="All" value="All" />
           <FilterButton label="Consults" value="consultation" />
@@ -279,7 +328,6 @@ export default function FinancesScreen() {
         </View>
       </ScrollView>
 
-      {/* Add Expense Modal */}
       <Modal visible={isAdding} animationType="slide" presentationStyle="pageSheet">
         <View className="flex-1 bg-background pt-12 px-6">
           <View className="flex-row justify-between items-center mb-6">
@@ -289,7 +337,6 @@ export default function FinancesScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* Type Selection */}
           <Text className="text-textMuted text-xs uppercase tracking-wider font-bold mb-3">Expense Type</Text>
           <View className="flex-row flex-wrap gap-2 mb-6">
             {(Object.entries(EXPENSE_CONFIG) as [ExpenseType, typeof EXPENSE_CONFIG[ExpenseType]][]).map(([type, config]) => (

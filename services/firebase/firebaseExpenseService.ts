@@ -1,4 +1,4 @@
-import { ref, push, get, set, query, orderByChild, equalTo, remove } from 'firebase/database';
+import { ref, push, get, set, query, orderByChild, equalTo, remove, onValue, off } from 'firebase/database';
 import { database } from './firebaseConfig';
 import { HealthExpense } from '../../types/database';
 import { firebasePrescriptionService } from './firebasePrescriptionService';
@@ -44,6 +44,25 @@ export const firebaseExpenseService = {
       console.error('[Firebase Expenses] create error:', error);
       throw error;
     }
+  },
+  onByPatient(patientId: string, callback: (expenses: HealthExpense[]) => void): () => void {
+    const expensesRef = ref(database, 'health_expenses');
+    const q = query(expensesRef, orderByChild('patient_id'), equalTo(patientId));
+
+    const listener = onValue(q, (snapshot) => {
+      if (!snapshot.exists()) {
+        callback([]);
+        return;
+      }
+
+      const results: HealthExpense[] = [];
+      snapshot.forEach((child) => {
+        results.push({ id: child.key!, ...child.val() });
+      });
+      callback(results);
+    });
+
+    return () => off(q, 'value', listener);
   },
 
   async rebuildMedicationExpensesForPatient(patientId: string): Promise<number> {

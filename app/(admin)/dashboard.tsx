@@ -18,47 +18,61 @@ export default function AdminDashboardScreen() {
   const [recentAppointments, setRecentAppointments] = useState<any[]>([]);
   const [recentPrescriptions, setRecentPrescriptions] = useState<any[]>([]);
 
-  const loadStats = useCallback(async () => {
-    try {
-      const users = await Services.auth.getAllUsers?.() || [];
-      const appointments = await Services.appointment.getAll();
-      const prescriptions = await Services.prescription.getAll();
-      const userMap = new Map(users.map((u: any) => [u.id, u.name]));
+  const syncStats = useCallback((users: any[], appointments: any[], prescriptions: any[]) => {
+    const userMap = new Map(users.map((u: any) => [u.id, u.name]));
 
-      const sortedAppointments = appointments
-        .sort((a: any, b: any) => new Date(b.scheduled_at).getTime() - new Date(a.scheduled_at).getTime())
-        .slice(0, 5)
-        .map((appt: any) => ({
-          ...appt,
-          patientLabel: appt.patient_name || userMap.get(appt.patient_id) || 'Patient',
-          doctorLabel: appt.doctor_name || userMap.get(appt.doctor_id) || 'Doctor',
-        }));
+    const sortedAppointments = appointments
+      .sort((a: any, b: any) => new Date(b.scheduled_at).getTime() - new Date(a.scheduled_at).getTime())
+      .slice(0, 5)
+      .map((appt: any) => ({
+        ...appt,
+        patientLabel: appt.patient_name || userMap.get(appt.patient_id) || 'Patient',
+        doctorLabel: appt.doctor_name || userMap.get(appt.doctor_id) || 'Doctor',
+      }));
 
-      const sortedPrescriptions = prescriptions
-        .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-        .slice(0, 5)
-        .map((presc: any) => ({
-          ...presc,
-          patientLabel: presc.patient_name || userMap.get(presc.patient_id) || 'Patient',
-          doctorLabel: presc.doctor_name || userMap.get(presc.doctor_id) || 'Doctor',
-        }));
+    const sortedPrescriptions = prescriptions
+      .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      .slice(0, 5)
+      .map((presc: any) => ({
+        ...presc,
+        patientLabel: presc.patient_name || userMap.get(presc.patient_id) || 'Patient',
+        doctorLabel: presc.doctor_name || userMap.get(presc.doctor_id) || 'Doctor',
+      }));
 
-      setStats({
-        totalUsers: users.length,
-        totalAppointments: appointments.length,
-        activePrescriptions: prescriptions.filter((p: any) => p.is_active).length,
-      });
-      setRecentAppointments(sortedAppointments);
-      setRecentPrescriptions(sortedPrescriptions);
-    } catch (error) {
-      console.error('Error loading admin stats:', error);
-    }
+    setStats({
+      totalUsers: users.length,
+      totalAppointments: appointments.length,
+      activePrescriptions: prescriptions.filter((p: any) => p.is_active).length,
+    });
+    setRecentAppointments(sortedAppointments);
+    setRecentPrescriptions(sortedPrescriptions);
   }, []);
 
   useFocusEffect(
     useCallback(() => {
-      loadStats();
-    }, [loadStats])
+      let latestUsers: any[] = [];
+      let latestAppointments: any[] = [];
+      let latestPrescriptions: any[] = [];
+
+      const unsubUsers = Services.auth.onAllUsers((users) => {
+        latestUsers = users;
+        syncStats(latestUsers, latestAppointments, latestPrescriptions);
+      });
+      const unsubAppointments = Services.appointment.onAll((appointments) => {
+        latestAppointments = appointments;
+        syncStats(latestUsers, latestAppointments, latestPrescriptions);
+      });
+      const unsubPrescriptions = Services.prescription.onAll((prescriptions) => {
+        latestPrescriptions = prescriptions;
+        syncStats(latestUsers, latestAppointments, latestPrescriptions);
+      });
+
+      return () => {
+        unsubUsers();
+        unsubAppointments();
+        unsubPrescriptions();
+      };
+    }, [syncStats])
   );
 
   return (

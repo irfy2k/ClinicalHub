@@ -104,7 +104,9 @@ export const firebaseChatService = {
         try {
           await notificationService.sendInstantNotification(
             `New Message from ${senderName || 'Secure Chat'}`,
-            message.content.length > 50 ? `${message.content.substring(0, 47)}...` : message.content
+            message.content.length > 50 ? `${message.content.substring(0, 47)}...` : message.content,
+            undefined,
+            recipientId
           );
         } catch (notifError) {
           console.warn('[Firebase Chat] Notification failed to send:', notifError);

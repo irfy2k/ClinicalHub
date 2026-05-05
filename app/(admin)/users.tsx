@@ -13,22 +13,15 @@ export default function AdminUsersScreen() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
 
-  const loadUsers = useCallback(async () => {
-    setLoading(true);
-    try {
-      const allUsers = await Services.auth.getAllUsers();
-      setUsers(allUsers);
-    } catch (error) {
-      console.error('Error loading users:', error);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
   useFocusEffect(
     useCallback(() => {
-      loadUsers();
-    }, [loadUsers])
+      setLoading(true);
+      const unsubscribe = Services.auth.onAllUsers((allUsers) => {
+        setUsers(allUsers);
+        setLoading(false);
+      });
+      return unsubscribe;
+    }, [])
   );
 
   const filteredUsers = users.filter(u => 

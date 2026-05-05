@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Alert, Modal, Image, RefreshControl, ActivityIndicator } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { FontAwesome } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { Services } from '../../services';
@@ -34,26 +35,22 @@ export default function MedicalVaultScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  const loadDocuments = useCallback(async () => {
-    if (!user) return;
-    try {
-      const docs = await Services.document.getByPatient(user.id);
-      setDocuments(docs);
-    } catch {
-      Alert.alert('Error', 'Failed to load records. Please try again.');
-    } finally {
-      setIsLoading(false);
-      setRefreshing(false);
-    }
-  }, [user]);
-
-  useEffect(() => {
-    loadDocuments();
-  }, [loadDocuments]);
+  useFocusEffect(
+    useCallback(() => {
+      if (!user) return;
+      setIsLoading(true);
+      const unsubscribe = Services.document.onByPatient(user.id, (docs) => {
+        setDocuments(docs);
+        setIsLoading(false);
+        setRefreshing(false);
+      });
+      return unsubscribe;
+    }, [user])
+  );
 
   const onRefresh = () => {
     setRefreshing(true);
-    loadDocuments();
+    setRefreshing(false);
   };
 
   const filteredDocs = documents.filter(doc => {

@@ -6,7 +6,7 @@ import {
   sendPasswordResetEmail,
   User as FirebaseUser,
 } from 'firebase/auth';
-import { ref, set, get, update, query, orderByChild, equalTo } from 'firebase/database';
+import { ref, set, get, update, query, orderByChild, equalTo, onValue, off } from 'firebase/database';
 import { auth, database } from './firebaseConfig';
 import { User } from '../../types/database';
 
@@ -183,6 +183,27 @@ export const firebaseAuthService = {
       console.error('[Firebase Auth] getAllUsers error:', error);
       return [];
     }
+  },
+  onAllUsers(callback: (users: User[]) => void): () => void {
+    if (!auth.currentUser) {
+      callback([]);
+      return () => {};
+    }
+    const usersRef = ref(database, 'users');
+    const listener = onValue(usersRef, (snapshot) => {
+      if (!snapshot.exists()) {
+        callback([]);
+        return;
+      }
+
+      const results: User[] = [];
+      snapshot.forEach((child) => {
+        results.push({ id: child.key!, ...child.val() });
+      });
+      callback(results);
+    });
+
+    return () => off(usersRef, 'value', listener);
   },
 
   /**

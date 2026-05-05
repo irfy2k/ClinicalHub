@@ -1,4 +1,4 @@
-import { ref, push, get, set, query, orderByChild, equalTo, update, remove, runTransaction } from 'firebase/database';
+import { ref, push, get, set, query, orderByChild, equalTo, update, remove, runTransaction, onValue, off } from 'firebase/database';
 import { database, cleanObject } from './firebaseConfig';
 import { Appointment } from '../../types/database';
 
@@ -75,6 +75,61 @@ export const firebaseAppointmentService = {
       return [];
     }
   },
+  onByPatient(patientId: string, callback: (appointments: Appointment[]) => void): () => void {
+    const appointmentsRef = ref(database, 'appointments');
+    const q = query(appointmentsRef, orderByChild('patient_id'), equalTo(patientId));
+
+    const listener = onValue(q, (snapshot) => {
+      if (!snapshot.exists()) {
+        callback([]);
+        return;
+      }
+
+      const results: Appointment[] = [];
+      snapshot.forEach((child) => {
+        results.push({ id: child.key!, ...child.val() });
+      });
+      callback(results);
+    });
+
+    return () => off(q, 'value', listener);
+  },
+  onByDoctor(doctorId: string, callback: (appointments: Appointment[]) => void): () => void {
+    const appointmentsRef = ref(database, 'appointments');
+    const q = query(appointmentsRef, orderByChild('doctor_id'), equalTo(doctorId));
+
+    const listener = onValue(q, (snapshot) => {
+      if (!snapshot.exists()) {
+        callback([]);
+        return;
+      }
+
+      const results: Appointment[] = [];
+      snapshot.forEach((child) => {
+        results.push({ id: child.key!, ...child.val() });
+      });
+      callback(results);
+    });
+
+    return () => off(q, 'value', listener);
+  },
+  onAll(callback: (appointments: Appointment[]) => void): () => void {
+    const appointmentsRef = ref(database, 'appointments');
+    const listener = onValue(appointmentsRef, (snapshot) => {
+      if (!snapshot.exists()) {
+        callback([]);
+        return;
+      }
+
+      const results: Appointment[] = [];
+      snapshot.forEach((child) => {
+        results.push({ id: child.key!, ...child.val() });
+      });
+      callback(results);
+    });
+
+    return () => off(appointmentsRef, 'value', listener);
+  },
 
   async create(appointment: Omit<Appointment, 'id' | 'created_at'>): Promise<Appointment> {
     try {
@@ -141,7 +196,7 @@ export const firebaseAppointmentService = {
       }
 
       const appointment = appointmentSnapshot.val() as Omit<Appointment, 'id'>;
-      await set(ref(database, `appointments/${id}/status`), status);
+      await update(appointmentRef, { status });
 
       const wasActive = ACTIVE_APPOINTMENT_STATUSES.includes(appointment.status);
       const isNowActive = ACTIVE_APPOINTMENT_STATUSES.includes(status);
@@ -202,7 +257,7 @@ export const firebaseAppointmentService = {
       console.error('[Firebase Appointments] markAsRead error:', error);
     }
   },
-  async checkForMissedAppointments(appointments: Appointment[]): Promise<void> {
+  async checkForMissedAppointments(appointments: Appointment[], currentUserId?: string): Promise<void> {
     const nowMs = Date.now();
     for (const appt of appointments) {
       const scheduledMs = new Date(appt.scheduled_at).getTime();
@@ -214,10 +269,14 @@ export const firebaseAppointmentService = {
           await this.updateStatus(appt.id, 'missed');
           // Send notification
           const { notificationService } = require('../notificationService');
-          await notificationService.sendInstantNotification(
-            'Missed Appointment',
-            `You missed your appointment with ${appt.doctor_name || 'your doctor'}.`
-          );
+          if (currentUserId && currentUserId === appt.patient_id) {
+            await notificationService.sendInstantNotification(
+              'Missed Appointment',
+              `You missed your appointment with ${appt.doctor_name || 'your doctor'}.`,
+              undefined,
+              currentUserId
+            );
+          }
         } catch (error) {
           console.error('[Firebase Appointments] Error updating missed appointment:', error);
         }

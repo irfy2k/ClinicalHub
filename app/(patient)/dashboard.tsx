@@ -38,40 +38,39 @@ export default function DashboardScreen() {
   const [totalUnread, setTotalUnread] = useState(0);
   const [isChatSelectionVisible, setIsChatSelectionVisible] = useState(false);
 
-  const loadDashboardData = useCallback(async () => {
-    if (!user) return;
-
-    // Load next appointment
-    const appts = await Services.appointment.getByPatient(user.id);
-    await Services.appointment.checkForMissedAppointments(appts);
+  const syncAppointments = useCallback(async (appts: any[]) => {
+    await Services.appointment.checkForMissedAppointments(appts, user?.id);
     const upcoming = appts
       .filter(a => a.status === 'pending' || a.status === 'confirmed')
       .sort((a, b) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime());
     setNextAppt(upcoming.length > 0 ? upcoming[0] : null);
 
-    // Find most recent appointment for messages shortcut
     const allSorted = appts
       .filter(a => a.status === 'pending' || a.status === 'confirmed')
       .sort((a, b) => new Date(b.scheduled_at).getTime() - new Date(a.scheduled_at).getTime());
-    
+
     setAllAppointments(allSorted);
-    // Calculate total unread messages for patient
     const unread = allSorted.reduce((sum, a) => sum + (a.unread_count_patient || 0), 0);
     setTotalUnread(unread);
-
-  // Load active prescriptions count
-  const prescData = await Services.prescription.getByPatient(user.id);
-  setActiveScripts(prescData.filter(p => p.is_active).length);
-
-  // Load documents count
-  const docs = await Services.document.getByPatient(user.id);
-  setDocCount(docs.length);
-}, [user]);
+  }, [user]);
 
   useFocusEffect(
     useCallback(() => {
-      loadDashboardData();
-    }, [loadDashboardData])
+      if (!user) return;
+      const unsubAppointments = Services.appointment.onByPatient(user.id, syncAppointments);
+      const unsubPrescriptions = Services.prescription.onByPatient(user.id, (prescData) => {
+        setActiveScripts(prescData.filter(p => p.is_active).length);
+      });
+      const unsubDocs = Services.document.onByPatient(user.id, (docs) => {
+        setDocCount(docs.length);
+      });
+
+      return () => {
+        unsubAppointments();
+        unsubPrescriptions();
+        unsubDocs();
+      };
+    }, [user, syncAppointments])
   );
 
 const [editVitals, setEditVitals] = useState(vitals);

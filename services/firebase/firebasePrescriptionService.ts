@@ -1,4 +1,4 @@
-import { ref, push, get, set, query, orderByChild, equalTo, update, remove } from 'firebase/database';
+import { ref, push, get, set, query, orderByChild, equalTo, update, remove, onValue, off } from 'firebase/database';
 import { database, cleanObject } from './firebaseConfig';
 import { Prescription, MedicationLog } from '../../types/database';
 
@@ -60,6 +60,61 @@ export const firebasePrescriptionService = {
       console.error('[Firebase Prescriptions] getByDoctor error:', error);
       return [];
     }
+  },
+  onByPatient(patientId: string, callback: (prescriptions: Prescription[]) => void): () => void {
+    const prescRef = ref(database, 'prescriptions');
+    const q = query(prescRef, orderByChild('patient_id'), equalTo(patientId));
+
+    const listener = onValue(q, (snapshot) => {
+      if (!snapshot.exists()) {
+        callback([]);
+        return;
+      }
+
+      const results: Prescription[] = [];
+      snapshot.forEach((child) => {
+        results.push({ id: child.key!, ...child.val() });
+      });
+      callback(results);
+    });
+
+    return () => off(q, 'value', listener);
+  },
+  onByDoctor(doctorId: string, callback: (prescriptions: Prescription[]) => void): () => void {
+    const prescRef = ref(database, 'prescriptions');
+    const q = query(prescRef, orderByChild('doctor_id'), equalTo(doctorId));
+
+    const listener = onValue(q, (snapshot) => {
+      if (!snapshot.exists()) {
+        callback([]);
+        return;
+      }
+
+      const results: Prescription[] = [];
+      snapshot.forEach((child) => {
+        results.push({ id: child.key!, ...child.val() });
+      });
+      callback(results);
+    });
+
+    return () => off(q, 'value', listener);
+  },
+  onAll(callback: (prescriptions: Prescription[]) => void): () => void {
+    const prescRef = ref(database, 'prescriptions');
+    const listener = onValue(prescRef, (snapshot) => {
+      if (!snapshot.exists()) {
+        callback([]);
+        return;
+      }
+
+      const results: Prescription[] = [];
+      snapshot.forEach((child) => {
+        results.push({ id: child.key!, ...child.val() });
+      });
+      callback(results);
+    });
+
+    return () => off(prescRef, 'value', listener);
   },
 
   async create(prescription: Omit<Prescription, 'id' | 'created_at'>): Promise<Prescription> {

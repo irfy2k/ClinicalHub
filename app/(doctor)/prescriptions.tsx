@@ -112,7 +112,9 @@ export default function DoctorPrescriptions() {
     await notificationService.scheduleMedicationReminders(newPrescription);
     await notificationService.sendInstantNotification(
       '💊 New Prescription Issued',
-      `${medName} (${dosage}) has been prescribed to ${patientName}. Reminders have been scheduled.`
+      `${medName} (${dosage}) has been prescribed to ${patientName}. Reminders have been scheduled.`,
+      undefined,
+      selectedPatientId
     );
 
     resetForm();

@@ -13,43 +13,40 @@ export default function AdminAppointmentsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  const loadAppointments = useCallback(async () => {
-    try {
-      const data = await Services.appointment.getAll();
-      const sorted = data.sort((a, b) => new Date(b.scheduled_at).getTime() - new Date(a.scheduled_at).getTime());
-      setAppointments(sorted);
+  const loadAppointments = useCallback(async (data: Appointment[]) => {
+    const sorted = data.sort((a, b) => new Date(b.scheduled_at).getTime() - new Date(a.scheduled_at).getTime());
+    setAppointments(sorted);
 
-      const uniqueIds = new Set<string>();
-      sorted.forEach((appt) => {
-        if (appt.patient_id) uniqueIds.add(appt.patient_id);
-        if (appt.doctor_id) uniqueIds.add(appt.doctor_id);
-      });
+    const uniqueIds = new Set<string>();
+    sorted.forEach((appt) => {
+      if (appt.patient_id) uniqueIds.add(appt.patient_id);
+      if (appt.doctor_id) uniqueIds.add(appt.doctor_id);
+    });
 
-      const missing = [...uniqueIds].filter((id) => !nameCache[id]);
-      if (missing.length) {
-        const entries = await Promise.all(
-          missing.map(async (id) => {
-            const profile = (await Services.auth.getUser(id)) as User | null;
-            return [id, profile?.name || 'Unknown'] as const;
-          })
-        );
-        setNameCache((prev) => ({ ...prev, ...Object.fromEntries(entries) }));
-      }
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
+    const missing = [...uniqueIds].filter((id) => !nameCache[id]);
+    if (missing.length) {
+      const entries = await Promise.all(
+        missing.map(async (id) => {
+          const profile = (await Services.auth.getUser(id)) as User | null;
+          return [id, profile?.name || 'Unknown'] as const;
+        })
+      );
+      setNameCache((prev) => ({ ...prev, ...Object.fromEntries(entries) }));
     }
+    setLoading(false);
+    setRefreshing(false);
   }, [nameCache]);
 
   useFocusEffect(
     useCallback(() => {
-      loadAppointments();
+      const unsubscribe = Services.appointment.onAll(loadAppointments);
+      return unsubscribe;
     }, [loadAppointments])
   );
 
   const onRefresh = () => {
     setRefreshing(true);
-    loadAppointments();
+    setRefreshing(false);
   };
 
   const handleDelete = (appt: Appointment) => {

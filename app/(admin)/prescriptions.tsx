@@ -13,43 +13,40 @@ export default function AdminPrescriptionsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  const loadPrescriptions = useCallback(async () => {
-    try {
-      const data = await Services.prescription.getAll();
-      const sorted = data.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-      setPrescriptions(sorted);
+  const loadPrescriptions = useCallback(async (data: Prescription[]) => {
+    const sorted = data.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    setPrescriptions(sorted);
 
-      const uniqueIds = new Set<string>();
-      sorted.forEach((presc) => {
-        if (presc.patient_id) uniqueIds.add(presc.patient_id);
-        if (presc.doctor_id) uniqueIds.add(presc.doctor_id);
-      });
+    const uniqueIds = new Set<string>();
+    sorted.forEach((presc) => {
+      if (presc.patient_id) uniqueIds.add(presc.patient_id);
+      if (presc.doctor_id) uniqueIds.add(presc.doctor_id);
+    });
 
-      const missing = [...uniqueIds].filter((id) => !nameCache[id]);
-      if (missing.length) {
-        const entries = await Promise.all(
-          missing.map(async (id) => {
-            const profile = (await Services.auth.getUser(id)) as User | null;
-            return [id, profile?.name || 'Unknown'] as const;
-          })
-        );
-        setNameCache((prev) => ({ ...prev, ...Object.fromEntries(entries) }));
-      }
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
+    const missing = [...uniqueIds].filter((id) => !nameCache[id]);
+    if (missing.length) {
+      const entries = await Promise.all(
+        missing.map(async (id) => {
+          const profile = (await Services.auth.getUser(id)) as User | null;
+          return [id, profile?.name || 'Unknown'] as const;
+        })
+      );
+      setNameCache((prev) => ({ ...prev, ...Object.fromEntries(entries) }));
     }
+    setLoading(false);
+    setRefreshing(false);
   }, [nameCache]);
 
   useFocusEffect(
     useCallback(() => {
-      loadPrescriptions();
+      const unsubscribe = Services.prescription.onAll(loadPrescriptions);
+      return unsubscribe;
     }, [loadPrescriptions])
   );
 
   const onRefresh = () => {
     setRefreshing(true);
-    loadPrescriptions();
+    setRefreshing(false);
   };
 
   const handleDelete = (presc: Prescription) => {

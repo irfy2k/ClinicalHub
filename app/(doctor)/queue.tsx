@@ -32,46 +32,41 @@ export default function QueueScreen() {
   });
   const [summaryErrors, setSummaryErrors] = useState<{ diagnosis?: string; assessment?: string }>({});
 
-  const loadAppointments = useCallback(async () => {
-    if (!user) return;
-    try {
-      const data = await Services.appointment.getByDoctor(user.id);
-      setAppointments(data);
-      // Automatically check for missed appointments
-      await Services.appointment.checkForMissedAppointments(data);
-
-      // Fetch patient names for all unique patient IDs
-      const uniquePatientIds = [...new Set(data.map(a => a.patient_id))];
-      const names: Record<string, string> = {};
-      await Promise.all(
-        uniquePatientIds.map(async (pid) => {
-          const apptWithName = data.find(a => a.patient_id === pid && a.patient_name);
-          if (apptWithName?.patient_name) {
-            names[pid] = apptWithName.patient_name;
-          } else {
-            const patient = await Services.auth.getUser(pid);
-            names[pid] = patient?.name || 'Unknown Patient';
-          }
-        })
-      );
-      setPatientNames(names);
-    } catch {
-      Alert.alert('Error', 'Failed to load appointments. Please try again.');
-    } finally {
-      setIsLoading(false);
-      setRefreshing(false);
-    }
-  }, [user]);
+  const refreshNames = useCallback(async (data: Appointment[]) => {
+    const uniquePatientIds = [...new Set(data.map(a => a.patient_id))];
+    const names: Record<string, string> = {};
+    await Promise.all(
+      uniquePatientIds.map(async (pid) => {
+        const apptWithName = data.find(a => a.patient_id === pid && a.patient_name);
+        if (apptWithName?.patient_name) {
+          names[pid] = apptWithName.patient_name;
+        } else {
+          const patient = await Services.auth.getUser(pid);
+          names[pid] = patient?.name || 'Unknown Patient';
+        }
+      })
+    );
+    setPatientNames(names);
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
-      loadAppointments();
-    }, [loadAppointments])
+      if (!user) return;
+      setIsLoading(true);
+      const unsubscribe = Services.appointment.onByDoctor(user.id, async (data) => {
+        setAppointments(data);
+        await Services.appointment.checkForMissedAppointments(data, user?.id);
+        await refreshNames(data);
+        setIsLoading(false);
+        setRefreshing(false);
+      });
+      return unsubscribe;
+    }, [user, refreshNames])
   );
 
   const onRefresh = () => {
     setRefreshing(true);
-    loadAppointments();
+    setRefreshing(false);
   };
 
   const processStatusChange = async (status: Appointment['status']) => {
@@ -90,7 +85,7 @@ export default function QueueScreen() {
         type: 'appointment_status',
         appointmentId: selectedAppt.id,
         status,
-      });
+      }, selectedAppt.patient_id);
     }
 
     setSelectedAppt(null);
