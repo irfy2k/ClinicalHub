@@ -53,7 +53,7 @@ logs/
 *.sw?
 
 # Documentation and Data
-*.md
+coverage/
 
 # Exceptions for critical configuration (optional but recommended)
 !package.json
@@ -78,3 +78,4 @@ temp/
 build/
 out/
 app-example/
+.expo-shared/

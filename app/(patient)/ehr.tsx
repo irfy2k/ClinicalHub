@@ -12,6 +12,7 @@ const FILE_TYPE_LABELS: Record<DocumentType, string> = {
   prescription: 'Prescription',
   lab_result: 'Lab Result',
   report: 'Report',
+  visit_summary: 'Visit Summary',
   other: 'Other',
 };
 
@@ -19,6 +20,7 @@ const FILE_TYPE_ICONS: Record<DocumentType, string> = {
   prescription: 'file-text-o',
   lab_result: 'flask',
   report: 'file-o',
+  visit_summary: 'clipboard',
   other: 'paperclip',
 };
 
@@ -58,9 +60,19 @@ export default function MedicalVaultScreen() {
     if (activeFilter === 'All Records') return true;
     if (activeFilter === 'Labs' && doc.file_type === 'lab_result') return true;
     if (activeFilter === 'Prescriptions' && doc.file_type === 'prescription') return true;
-    if (activeFilter === 'Reports' && doc.file_type === 'report') return true;
+    if (activeFilter === 'Reports' && (doc.file_type === 'report' || doc.file_type === 'visit_summary')) return true;
     return false;
   });
+
+  const renderSummarySection = (label: string, value?: string) => {
+    if (!value) return null;
+    return (
+      <View className="mb-4">
+        <Text className="text-textMuted text-xs uppercase tracking-wider font-bold mb-1">{label}</Text>
+        <Text className="text-textLight text-base leading-6">{value}</Text>
+      </View>
+    );
+  };
 
   const handleUpload = async () => {
     if (!user) return;
@@ -211,7 +223,17 @@ export default function MedicalVaultScreen() {
            </TouchableOpacity>
            
            <View className="w-full h-[70%] bg-surface rounded-3xl overflow-hidden border border-borderDark shadow-2xl">
-             {previewDoc?.storage_path.startsWith('data:') ? (
+             {previewDoc?.summary ? (
+               <ScrollView contentContainerStyle={{ padding: 20 }}>
+                 <Text className="text-textLight font-bold text-xl mb-4">Visit Summary</Text>
+                 {renderSummarySection('Diagnosis', previewDoc.summary.diagnosis)}
+                 {renderSummarySection('Assessment', previewDoc.summary.assessment)}
+                 {renderSummarySection('Treatment Plan', previewDoc.summary.treatment_plan)}
+                 {renderSummarySection('Medications', previewDoc.summary.medications)}
+                 {renderSummarySection('Follow Up', previewDoc.summary.follow_up)}
+                 {renderSummarySection('Additional Notes', previewDoc.summary.notes)}
+               </ScrollView>
+             ) : previewDoc?.storage_path.startsWith('data:') ? (
                <Image 
                  source={{ uri: previewDoc.storage_path }} 
                  style={{ width: '100%', height: '100%' }} 

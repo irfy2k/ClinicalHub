@@ -7,6 +7,7 @@ import { Services } from '../../services';
 import { Appointment } from '../../types/database';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
+import { Input } from '../../components/ui/Input';
 import { notificationService } from '../../services/notificationService';
 import { clsx } from 'clsx';
 import { useRouter } from 'expo-router';
@@ -19,6 +20,17 @@ export default function QueueScreen() {
   const [patientNames, setPatientNames] = useState<Record<string, string>>({});
   const [refreshing, setRefreshing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSummaryOpen, setIsSummaryOpen] = useState(false);
+  const [isSavingSummary, setIsSavingSummary] = useState(false);
+  const [summaryDraft, setSummaryDraft] = useState({
+    diagnosis: '',
+    assessment: '',
+    treatment_plan: '',
+    medications: '',
+    follow_up: '',
+    notes: '',
+  });
+  const [summaryErrors, setSummaryErrors] = useState<{ diagnosis?: string; assessment?: string }>({});
 
   const loadAppointments = useCallback(async () => {
     if (!user) return;
@@ -83,6 +95,72 @@ export default function QueueScreen() {
 
     setSelectedAppt(null);
     loadAppointments();
+  };
+
+  const resetSummaryDraft = () => {
+    setSummaryDraft({
+      diagnosis: '',
+      assessment: '',
+      treatment_plan: '',
+      medications: '',
+      follow_up: '',
+      notes: '',
+    });
+    setSummaryErrors({});
+  };
+
+  const openSummaryModal = () => {
+    if (!selectedAppt) return;
+    resetSummaryDraft();
+    setIsSummaryOpen(true);
+  };
+
+  const handleSummarySubmit = async () => {
+    if (!selectedAppt || !user) return;
+
+    const errors: { diagnosis?: string; assessment?: string } = {};
+    if (!summaryDraft.diagnosis.trim()) errors.diagnosis = 'Diagnosis is required.';
+    if (!summaryDraft.assessment.trim()) errors.assessment = 'Assessment is required.';
+    if (Object.keys(errors).length > 0) {
+      setSummaryErrors(errors);
+      return;
+    }
+
+    setIsSavingSummary(true);
+    try {
+      const patientName = getPatientName(selectedAppt.patient_id);
+      const visitDate = new Date(selectedAppt.scheduled_at).toISOString().split('T')[0];
+      const safeName = patientName.replace(/\s+/g, '_');
+      const fileName = `Visit_Summary_${safeName}_${visitDate}`;
+
+      await Services.document.create({
+        patient_id: selectedAppt.patient_id,
+        uploaded_by: user.id,
+        file_name: fileName,
+        file_type: 'visit_summary',
+        storage_path: `summary:${selectedAppt.id}`,
+        appointment_id: selectedAppt.id,
+        doctor_id: user.id,
+        doctor_name: user.name,
+        patient_name: patientName,
+        summary: {
+          diagnosis: summaryDraft.diagnosis.trim(),
+          assessment: summaryDraft.assessment.trim(),
+          treatment_plan: summaryDraft.treatment_plan.trim() || undefined,
+          medications: summaryDraft.medications.trim() || undefined,
+          follow_up: summaryDraft.follow_up.trim() || undefined,
+          notes: summaryDraft.notes.trim() || undefined,
+        },
+      });
+
+      await processStatusChange('completed');
+      setIsSummaryOpen(false);
+      resetSummaryDraft();
+    } catch {
+      Alert.alert('Error', 'Failed to save visit summary. Please try again.');
+    } finally {
+      setIsSavingSummary(false);
+    }
   };
 
   const handleStatusChange = (status: Appointment['status']) => {
@@ -236,7 +314,7 @@ export default function QueueScreen() {
               <View className="flex-row mb-3 gap-2">
                 <TouchableOpacity 
                   className="flex-1 bg-primary py-4 rounded-xl items-center justify-center"
-                  onPress={() => handleStatusChange('completed')}
+                  onPress={openSummaryModal}
                 >
                   <Text className="text-background font-bold">Complete Visit</Text>
                 </TouchableOpacity>
@@ -290,6 +368,82 @@ export default function QueueScreen() {
               fullWidth 
               onPress={() => handleStatusChange('cancelled')} 
             />
+          </View>
+        </View>
+      </Modal>
+
+      {/* Visit Summary Modal */}
+      <Modal visible={isSummaryOpen} animationType="slide" transparent={true}>
+        <View className="flex-1 bg-background/95 justify-end">
+          <View className="bg-surface rounded-t-3xl p-6 border-t border-borderDark max-h-[90%]">
+            <View className="flex-row justify-between items-center mb-4">
+              <Text className="text-xl font-bold text-textLight">Visit Summary</Text>
+              <TouchableOpacity onPress={() => setIsSummaryOpen(false)}>
+                <FontAwesome name="close" size={22} color="#E2E8F0" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView className="mb-6">
+              <Input
+                label="Diagnosis"
+                placeholder="Primary diagnosis"
+                value={summaryDraft.diagnosis}
+                error={summaryErrors.diagnosis}
+                onChangeText={(value) => setSummaryDraft(prev => ({ ...prev, diagnosis: value }))}
+              />
+              <Input
+                label="Assessment"
+                placeholder="Clinical assessment summary"
+                value={summaryDraft.assessment}
+                error={summaryErrors.assessment}
+                onChangeText={(value) => setSummaryDraft(prev => ({ ...prev, assessment: value }))}
+                multiline
+              />
+              <Input
+                label="Treatment Plan"
+                placeholder="Plan of care"
+                value={summaryDraft.treatment_plan}
+                onChangeText={(value) => setSummaryDraft(prev => ({ ...prev, treatment_plan: value }))}
+                multiline
+              />
+              <Input
+                label="Medications"
+                placeholder="Medication changes or recommendations"
+                value={summaryDraft.medications}
+                onChangeText={(value) => setSummaryDraft(prev => ({ ...prev, medications: value }))}
+                multiline
+              />
+              <Input
+                label="Follow Up"
+                placeholder="Follow up instructions"
+                value={summaryDraft.follow_up}
+                onChangeText={(value) => setSummaryDraft(prev => ({ ...prev, follow_up: value }))}
+                multiline
+              />
+              <Input
+                label="Additional Notes"
+                placeholder="Any other notes"
+                value={summaryDraft.notes}
+                onChangeText={(value) => setSummaryDraft(prev => ({ ...prev, notes: value }))}
+                multiline
+              />
+            </ScrollView>
+
+            <View className="flex-row gap-3">
+              <Button
+                label="Cancel"
+                variant="secondary"
+                className="flex-1"
+                onPress={() => setIsSummaryOpen(false)}
+                disabled={isSavingSummary}
+              />
+              <Button
+                label={isSavingSummary ? 'Saving...' : 'Save & Complete'}
+                className="flex-1"
+                onPress={handleSummarySubmit}
+                disabled={isSavingSummary}
+              />
+            </View>
           </View>
         </View>
       </Modal>

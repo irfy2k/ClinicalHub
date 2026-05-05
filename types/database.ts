@@ -86,7 +86,16 @@ export interface ChatMessage {
   created_at: string;
 }
 
-export type DocumentType = 'prescription' | 'lab_result' | 'report' | 'other';
+export type DocumentType = 'prescription' | 'lab_result' | 'report' | 'visit_summary' | 'other';
+
+export interface VisitSummary {
+  diagnosis: string;
+  assessment?: string;
+  treatment_plan?: string;
+  medications?: string;
+  follow_up?: string;
+  notes?: string;
+}
 
 export interface DocumentRecord {
   id: string;
@@ -96,5 +105,10 @@ export interface DocumentRecord {
   file_type: DocumentType;
   storage_path: string;
   file_size_bytes?: number;
+  appointment_id?: string;
+  doctor_id?: string;
+  doctor_name?: string;
+  patient_name?: string;
+  summary?: VisitSummary;
   created_at: string;
 }
