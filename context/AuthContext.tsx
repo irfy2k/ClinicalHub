@@ -116,6 +116,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = async () => {
     setIsLoading(true);
     try {
+      await notificationService.cancelAllNotifications();
       await firebaseAuthService.logout();
       setUser(null);
     } finally {

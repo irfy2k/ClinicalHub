@@ -151,7 +151,7 @@ export default function MedicationsScreen() {
       await notificationService.scheduleAllMedicationReminders(prescriptions);
       Alert.alert('Reminders Enabled', 'You will receive medication reminders at each scheduled time.');
     } else {
-      await notificationService.cancelAllNotifications();
+      await notificationService.clearMedicationReminders();
       Alert.alert('Reminders Disabled', 'All medication reminders have been cancelled.');
     }
   };

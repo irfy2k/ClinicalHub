@@ -89,7 +89,6 @@ export default function QueueScreen() {
     }
 
     setSelectedAppt(null);
-    loadAppointments();
   };
 
   const resetSummaryDraft = () => {
@@ -192,7 +191,7 @@ export default function QueueScreen() {
             <FontAwesome name="sign-out" size={16} color="#E2E8F0" />
           </TouchableOpacity>
         </View>
-        
+
         <View className="flex-row gap-4 mb-4">
           <Card className="flex-1 bg-surface py-4 px-4 items-center">
             <Text className="text-textMuted text-xs font-bold uppercase tracking-wider mb-2">Total</Text>
@@ -207,7 +206,7 @@ export default function QueueScreen() {
         <Text className="text-textLight font-bold mt-4 mb-2">Your Upcoming Queue</Text>
       </View>
 
-      <ScrollView 
+      <ScrollView
         contentContainerStyle={{ padding: 24, paddingTop: 4 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#85B523" />}
       >
@@ -242,10 +241,10 @@ export default function QueueScreen() {
                   </View>
                 </View>
                 <View>
-                  <FontAwesome 
-                    name={appt.status === 'completed' ? 'check-circle' : appt.status === 'pending' ? 'clock-o' : 'calendar-check-o'} 
-                    size={20} 
-                    color={appt.status === 'completed' ? '#85B523' : appt.status === 'pending' ? '#E2E8F0' : appt.status === 'missed' ? '#F87171' : '#2C3E50'} 
+                  <FontAwesome
+                    name={appt.status === 'completed' ? 'check-circle' : appt.status === 'pending' ? 'clock-o' : 'calendar-check-o'}
+                    size={20}
+                    color={appt.status === 'completed' ? '#85B523' : appt.status === 'pending' ? '#E2E8F0' : appt.status === 'missed' ? '#F87171' : '#2C3E50'}
                   />
                 </View>
               </Card>
@@ -259,61 +258,61 @@ export default function QueueScreen() {
         <View className="flex-1 bg-background/90 justify-end">
           <View className="bg-surface rounded-t-3xl p-6 border-t border-borderDark max-h-[90%]">
             <View className="flex-row justify-between items-center mb-6">
-               <Text className="text-xl font-bold text-textLight">Manage Appointment</Text>
-               <TouchableOpacity onPress={() => setSelectedAppt(null)}>
-                  <FontAwesome name="close" size={24} color="#E2E8F0" />
-               </TouchableOpacity>
+              <Text className="text-xl font-bold text-textLight">Manage Appointment</Text>
+              <TouchableOpacity onPress={() => setSelectedAppt(null)}>
+                <FontAwesome name="close" size={24} color="#E2E8F0" />
+              </TouchableOpacity>
             </View>
 
             <ScrollView className="mb-6">
               <Text className="text-textLight font-bold text-lg mb-1">
                 {selectedAppt ? getPatientName(selectedAppt.patient_id) : ''}
               </Text>
-              
+
               <View className="bg-surfaceLight p-4 rounded-xl border border-borderDark mb-4 mt-2">
-                 <Text className="text-textMuted text-xs font-bold uppercase tracking-wider mb-2">Pre-consultation details</Text>
-                 <Text className="text-textLight leading-5 mb-3">{selectedAppt?.notes}</Text>
-                 
-                 {selectedAppt?.photo_data && (
-                   <View className="mt-4">
-                     <Text className="text-textMuted text-xs font-bold uppercase tracking-wider mb-2">Patient Uploaded Photo</Text>
-                     <Image 
-                       source={{ uri: selectedAppt.photo_data }} 
-                       style={{ width: '100%', height: 200, borderRadius: 8, borderWidth: 1, borderColor: '#2F333A' }} 
-                       resizeMode="cover"
-                     />
-                   </View>
-                 )}
+                <Text className="text-textMuted text-xs font-bold uppercase tracking-wider mb-2">Pre-consultation details</Text>
+                <Text className="text-textLight leading-5 mb-3">{selectedAppt?.notes}</Text>
+
+                {selectedAppt?.photo_data && (
+                  <View className="mt-4">
+                    <Text className="text-textMuted text-xs font-bold uppercase tracking-wider mb-2">Patient Uploaded Photo</Text>
+                    <Image
+                      source={{ uri: selectedAppt.photo_data }}
+                      style={{ width: '100%', height: 200, borderRadius: 8, borderWidth: 1, borderColor: '#2F333A' }}
+                      resizeMode="cover"
+                    />
+                  </View>
+                )}
               </View>
 
               <View className="flex-row items-center">
-                 <View className={clsx("px-2 py-1 border rounded-md mr-2", selectedAppt?.status === 'pending' ? "border-primary bg-primary/20" : "border-borderDark")}>
-                   <Text className={clsx("text-xs font-bold uppercase", selectedAppt?.status === 'pending' ? "text-primary" : "text-textMuted")}>{selectedAppt?.status}</Text>
-                 </View>
-                 <Text className="text-textMuted text-sm">{new Date(selectedAppt?.scheduled_at || Date.now()).toLocaleString()}</Text>
+                <View className={clsx("px-2 py-1 border rounded-md mr-2", selectedAppt?.status === 'pending' ? "border-primary bg-primary/20" : "border-borderDark")}>
+                  <Text className={clsx("text-xs font-bold uppercase", selectedAppt?.status === 'pending' ? "text-primary" : "text-textMuted")}>{selectedAppt?.status}</Text>
+                </View>
+                <Text className="text-textMuted text-sm">{new Date(selectedAppt?.scheduled_at || Date.now()).toLocaleString()}</Text>
               </View>
             </ScrollView>
 
             <Text className="text-textMuted text-xs font-bold uppercase tracking-wider mb-3">Actions</Text>
-            
+
             {selectedAppt?.status === 'pending' && (
-              <Button 
-                label="Mark as Confirmed" 
-                fullWidth 
+              <Button
+                label="Mark as Confirmed"
+                fullWidth
                 className="mb-3"
-                onPress={() => handleStatusChange('confirmed')} 
+                onPress={() => handleStatusChange('confirmed')}
               />
             )}
-            
+
             {(selectedAppt?.status === 'pending' || selectedAppt?.status === 'confirmed') && (
               <View className="flex-row mb-3 gap-2">
-                <TouchableOpacity 
+                <TouchableOpacity
                   className="flex-1 bg-primary py-4 rounded-xl items-center justify-center"
                   onPress={openSummaryModal}
                 >
                   <Text className="text-background font-bold">Complete Visit</Text>
                 </TouchableOpacity>
-                <TouchableOpacity 
+                <TouchableOpacity
                   className="flex-1 bg-surfaceLight border border-primary py-4 rounded-xl items-center justify-center"
                   onPress={() => {
                     setSelectedAppt(null);
@@ -326,7 +325,7 @@ export default function QueueScreen() {
             )}
 
             <View className="flex-row mb-4 gap-2">
-              <TouchableOpacity 
+              <TouchableOpacity
                 className="flex-1 bg-surfaceLight border border-borderDark py-4 rounded-xl items-center justify-center relative"
                 onPress={() => {
                   if (!selectedAppt) return;
@@ -342,7 +341,7 @@ export default function QueueScreen() {
                 )}
                 <Text className="text-textLight font-bold">Message</Text>
               </TouchableOpacity>
-              <TouchableOpacity 
+              <TouchableOpacity
                 className="flex-1 bg-surfaceLight border border-borderDark py-4 rounded-xl items-center justify-center"
                 onPress={() => {
                   if (!selectedAppt) return;
@@ -356,12 +355,12 @@ export default function QueueScreen() {
             </View>
 
             <Text className="text-textMuted text-xs font-bold uppercase tracking-wider mb-3">Update Status</Text>
-            
-            <Button 
-              label="Cancel Appointment" 
+
+            <Button
+              label="Cancel Appointment"
               variant="danger"
-              fullWidth 
-              onPress={() => handleStatusChange('cancelled')} 
+              fullWidth
+              onPress={() => handleStatusChange('cancelled')}
             />
           </View>
         </View>

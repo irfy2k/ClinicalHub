@@ -29,8 +29,8 @@ export default function PatientAppointments() {
   const [isLoading, setIsLoading] = useState(true);
   const getPakistanNow = () => {
     const now = new Date();
-    const utcMs = now.getTime() + now.getTimezoneOffset() * 60 * 1000;
-    return new Date(utcMs + PKT_OFFSET_MINUTES * 60 * 1000);
+    // now.getTime() is UTC ms. We add the 5 hour offset (300 mins) to get Pakistan timestamp.
+    return new Date(now.getTime() + PKT_OFFSET_MINUTES * 60 * 1000);
   };
 
   const toPakistanDateKey = (date: Date) => {
@@ -61,13 +61,22 @@ export default function PatientAppointments() {
   };
 
   const isPastSlotForDate = (dateStr: string, slot: string) => {
-    const todayKey = toPakistanDateKey(getPakistanNow());
-    if (dateStr !== todayKey) return false;
-    const now = getPakistanNow();
+    const nowPkt = getPakistanNow();
+    const todayKey = toPakistanDateKey(nowPkt);
+    
+    // If selecting a date in the past, all slots are past
+    if (dateStr < todayKey) return true;
+    // If selecting a date in the future, no slots are past
+    if (dateStr > todayKey) return false;
+    
+    // If today, check if slot time has passed
     const [h, m] = normalizeSlot(slot).split(':').map(Number);
     if (Number.isNaN(h) || Number.isNaN(m)) return false;
+    
     const slotMinutes = h * 60 + m;
-    const nowMinutes = now.getUTCHours() * 60 + now.getUTCMinutes();
+    const nowMinutes = nowPkt.getUTCHours() * 60 + nowPkt.getUTCMinutes();
+    
+    // Add 15 min buffer or just <= now
     return slotMinutes <= nowMinutes;
   };
 
@@ -115,6 +124,7 @@ export default function PatientAppointments() {
       const unsubscribe = Services.appointment.onByPatient(user.id, async (data) => {
         setAppointments(data);
         await Services.appointment.checkForMissedAppointments(data, user?.id);
+        await notificationService.syncAppointmentReminders(data);
       });
       return unsubscribe;
     }, [user])

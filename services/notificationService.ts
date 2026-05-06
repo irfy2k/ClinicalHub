@@ -26,7 +26,11 @@ class NotificationService {
   private scheduledReminders: ScheduledReminder[] = [];
   private currentUserId: string | null = null;
 
-  setCurrentUserId(userId: string | null) {
+  async setCurrentUserId(userId: string | null) {
+    if (this.currentUserId && this.currentUserId !== userId) {
+      // User changed or logged out, clear everything
+      await this.cancelAllNotifications();
+    }
     this.currentUserId = userId;
   }
 
@@ -132,8 +136,15 @@ class NotificationService {
 
   /**
    * Schedule all medication reminders for an array of active prescriptions.
+   * Cancels ALL existing medication reminders before scheduling to ensure consistency.
    */
   async scheduleAllMedicationReminders(prescriptions: Prescription[]): Promise<void> {
+    if (Platform.OS === 'web') return;
+
+    // 1. Cancel all existing medication reminders
+    await this.clearMedicationReminders();
+
+    // 2. Only schedule for active ones
     const activePrescriptions = prescriptions.filter(p => p.is_active);
     for (const prescription of activePrescriptions) {
       await this.scheduleMedicationReminders(prescription);
@@ -141,21 +152,114 @@ class NotificationService {
   }
 
   /**
+   * Clear all scheduled medication reminders.
+   */
+  async clearMedicationReminders(): Promise<void> {
+    if (Platform.OS === 'web') return;
+    const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+    for (const notification of scheduled) {
+      if (notification.content.data?.type === 'medication_reminder') {
+        await Notifications.cancelScheduledNotificationAsync(notification.identifier);
+      }
+    }
+    this.scheduledReminders = [];
+  }
+
+  /**
+   * Clear all scheduled appointment reminders.
+   */
+  async clearAppointmentReminders(): Promise<void> {
+    if (Platform.OS === 'web') return;
+    const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+    for (const notification of scheduled) {
+      if (notification.content.data?.type === 'appointment_reminder') {
+        await Notifications.cancelScheduledNotificationAsync(notification.identifier);
+      }
+    }
+  }
+
+  /**
    * Cancel all scheduled reminders for a specific prescription.
    */
   async cancelRemindersForPrescription(prescriptionId: string): Promise<void> {
-    const toCancel = this.scheduledReminders.filter(
-      r => r.prescriptionId === prescriptionId
-    );
-
     if (Platform.OS === 'web') return;
-    for (const reminder of toCancel) {
-      await Notifications.cancelScheduledNotificationAsync(reminder.notificationId);
+    
+    const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+    for (const notification of scheduled) {
+      if (
+        notification.content.data?.type === 'medication_reminder' &&
+        notification.content.data?.prescriptionId === prescriptionId
+      ) {
+        await Notifications.cancelScheduledNotificationAsync(notification.identifier);
+      }
     }
 
     this.scheduledReminders = this.scheduledReminders.filter(
       r => r.prescriptionId !== prescriptionId
     );
+  }
+
+  /**
+   * Cancel reminders for a specific appointment.
+   */
+  async cancelRemindersForAppointment(appointmentId: string): Promise<void> {
+    if (Platform.OS === 'web') return;
+
+    const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+    for (const notification of scheduled) {
+      if (
+        notification.content.data?.type === 'appointment_reminder' &&
+        notification.content.data?.appointmentId === appointmentId
+      ) {
+        await Notifications.cancelScheduledNotificationAsync(notification.identifier);
+      }
+    }
+  }
+
+  /**
+   * Sync appointment reminders for a list of upcoming appointments.
+   * Ensures we have reminders for confirmed/pending future appointments and none for others.
+   */
+  async syncAppointmentReminders(appointments: any[]): Promise<void> {
+    if (Platform.OS === 'web') return;
+
+    const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+    const now = Date.now();
+
+    // 1. Identify valid appointments for reminders (upcoming & active)
+    const validAppointments = appointments.filter(appt => 
+      (appt.status === 'pending' || appt.status === 'confirmed') &&
+      new Date(appt.scheduled_at).getTime() > now + (31 * 60 * 1000) // At least 31 mins in future
+    );
+
+    const validIds = new Set(validAppointments.map(a => a.id));
+
+    // 2. Cancel existing reminders for appointments no longer valid or not in the list
+    for (const notification of scheduled) {
+      if (notification.content.data?.type === 'appointment_reminder') {
+        const apptId = notification.content.data.appointmentId;
+        if (!validIds.has(apptId)) {
+          await Notifications.cancelScheduledNotificationAsync(notification.identifier);
+        }
+      }
+    }
+
+    // 3. Schedule reminders for those that don't have one yet
+    const currentReminderApptIds = new Set(
+      scheduled
+        .filter(n => n.content.data?.type === 'appointment_reminder')
+        .map(n => n.content.data.appointmentId)
+    );
+
+    for (const appt of validAppointments) {
+      if (!currentReminderApptIds.has(appt.id)) {
+        await this.scheduleAppointmentReminder(
+          appt.id,
+          appt.doctor_name || 'your doctor',
+          appt.scheduled_at
+        );
+      }
+    }
   }
 
   /**
